@@ -1,0 +1,23 @@
+# Secrets — never commit real env values
+.env
+
+# Compiled binaries
+/api
+/worker
+*.exe
+
+# Go build/test artifacts
+/bin/
+*.out
+
+# Local reference copies / scratch (keep off GitHub)
+/reference/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Frontend deps/build (added later)
+web/node_modules/
+web/dist/
