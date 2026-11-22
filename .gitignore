@@ -21,3 +21,5 @@
 # Frontend deps/build (added later)
 web/node_modules/
 web/dist/
+
+/api-linux
