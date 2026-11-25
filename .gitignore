@@ -23,3 +23,5 @@ web/node_modules/
 web/dist/
 
 /api-linux
+/worker-linux
+/site.tgz
