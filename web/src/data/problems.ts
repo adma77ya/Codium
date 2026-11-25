@@ -81,57 +81,6 @@ export const problems: Problem[] = [
       go: `package main\n\nimport "fmt"\n\nfunc main() {\n\tvar s string\n\tfmt.Scan(&s)\n\t// ${MARK}\n}\n`,
     },
   },
-  {
-    letter: 'D',
-    slug: 'merge-intervals',
-    title: 'Merge Intervals',
-    difficulty: 'Medium',
-    tags: ['Sorting', 'Intervals'],
-    acceptance: 38.2,
-    timeLimitMs: 2000,
-    memoryMb: 256,
-    statement: [
-      'You are given closed intervals [l, r]. Merge every group of overlapping intervals and print the result sorted by start.',
-      'Intervals that touch at an endpoint, such as [1, 3] and [3, 5], count as overlapping.',
-    ],
-    input: 'The first line has n. Each of the next n lines has two integers l and r.',
-    output: 'The merged intervals, one per line, as "l r".',
-    examples: [
-      { input: '4\n1 3\n2 6\n8 10\n15 18', output: '1 6\n8 10\n15 18' },
-    ],
-    constraints: ['1 ≤ n ≤ 200 000', '0 ≤ l ≤ r ≤ 10⁹'],
-    starter: {
-      python: `import sys\n\ndata = sys.stdin.read().split()\nn = int(data[0])\nintervals = [(int(data[1 + 2 * i]), int(data[2 + 2 * i])) for i in range(n)]\n# ${MARK}\n`,
-      cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    int n; cin >> n;\n    vector<pair<int,int>> v(n);\n    for (auto &p : v) cin >> p.first >> p.second;\n    // ${MARK}\n    return 0;\n}\n`,
-      go: `package main\n\nimport "fmt"\n\nfunc main() {\n\tvar n int\n\tfmt.Scan(&n)\n\t// ${MARK}\n}\n`,
-    },
-  },
-  {
-    letter: 'E',
-    slug: 'median-of-two-arrays',
-    title: 'Median of Two Sorted Arrays',
-    difficulty: 'Hard',
-    tags: ['Binary Search', 'Divide and Conquer'],
-    acceptance: 29.5,
-    timeLimitMs: 2000,
-    memoryMb: 256,
-    statement: [
-      'Two sorted arrays are given. Find the median of all their elements combined, without merging them.',
-      'Your solution must run in O(log(m + n)) time.',
-    ],
-    input: 'Line 1: m and n. Line 2: m sorted integers. Line 3: n sorted integers.',
-    output: 'The median, printed with one decimal place.',
-    examples: [
-      { input: '2 1\n1 3\n2', output: '2.0' },
-      { input: '2 2\n1 2\n3 4', output: '2.5' },
-    ],
-    constraints: ['0 ≤ m, n ≤ 1 000 000', 'm + n ≥ 1', '-10⁹ ≤ values ≤ 10⁹'],
-    starter: {
-      python: `import sys\n\ndata = sys.stdin.read().split()\n# ${MARK}\n`,
-      cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    int m, n; cin >> m >> n;\n    vector<long long> a(m), b(n);\n    for (auto &x : a) cin >> x;\n    for (auto &x : b) cin >> x;\n    // ${MARK}\n    return 0;\n}\n`,
-      go: `package main\n\nimport "fmt"\n\nfunc main() {\n\tvar m, n int\n\tfmt.Scan(&m, &n)\n\t// ${MARK}\n}\n`,
-    },
-  },
 ]
 
 export const STARTER_MARK = MARK
