@@ -1,0 +1,1702 @@
+<title>Codium System Design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky chapter rail on the left, one 760px reading column, code and diagrams scroll inside their own boxes. */
+:root{
+  --bg:#f2f5f7; --panel:#ffffff; --fg:#15222d; --muted:#5a6b78; --line:#d5dde3;
+  --accent:#0e7490; --accent-soft:#d9eef3; --warn:#b4472b; --warn-soft:#f8e4dd;
+  --code-bg:#0f1c26; --code-fg:#d7e3ea; --code-com:#7f97a6; --code-kw:#7fd1e6;
+  --font-display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --font-body:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c151c; --panel:#13212b; --fg:#e3ecf1; --muted:#93a6b3; --line:#243845;
+  --accent:#4fc3dc; --accent-soft:#143342; --warn:#f0997e; --warn-soft:#3a2119;
+  --code-bg:#081117; --code-fg:#d7e3ea; --code-com:#7f97a6; --code-kw:#7fd1e6; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c151c; --panel:#13212b; --fg:#e3ecf1; --muted:#93a6b3; --line:#243845;
+  --accent:#4fc3dc; --accent-soft:#143342; --warn:#f0997e; --warn-soft:#3a2119;
+  --code-bg:#081117; --code-fg:#d7e3ea; --code-com:#7f97a6; --code-kw:#7fd1e6; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:16px;line-height:1.65;
+  padding-block:0 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px}
+nav.rail{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;max-height:100vh;overflow-y:auto;padding:28px 0;font-size:13.5px}
+nav.rail b{display:block;font-family:var(--font-display);font-size:15px;margin-bottom:10px}
+nav.rail a{display:block;color:var(--muted);text-decoration:none;padding:4px 0 4px 10px;border-left:2px solid var(--line)}
+nav.rail a:hover,nav.rail a:focus-visible{color:var(--accent);border-left-color:var(--accent);outline:none}
+main{min-width:0;padding-top:36px}
+h1,h2,h3{font-family:var(--font-display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(34px,6vw,54px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:30px;font-weight:700;letter-spacing:-.01em;margin-top:64px;padding-top:24px;border-top:1px solid var(--line)}
+h3{font-size:20px;font-weight:500;margin-top:36px}
+p{margin:12px 0;max-width:68ch}
+ul,ol{max-width:68ch;padding-left:22px;margin:10px 0}
+li{margin:5px 0}
+.lede{font-size:19px;color:var(--muted);max-width:60ch}
+.kicker{font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+code{font-family:var(--font-mono);font-size:.88em;background:var(--accent-soft);padding:1px 5px;border-radius:3px}
+figure.code{margin:16px 0;background:var(--code-bg);border-radius:6px;overflow:hidden}
+figure.code figcaption{font-family:var(--font-mono);font-size:12px;color:var(--code-com);padding:7px 14px;border-bottom:1px solid #ffffff1a}
+figure.code pre{margin:0;padding:14px;overflow-x:auto;font-family:var(--font-mono);font-size:13px;line-height:1.55;color:var(--code-fg)}
+figure.code pre code{background:none;padding:0;font-size:inherit;color:inherit}
+.c{color:var(--code-com)} .k{color:var(--code-kw)}
+.say{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 4px 4px 0;max-width:68ch;margin:14px 0}
+.say::before{content:"Say it like this";display:block;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+.trap{border-left:3px solid var(--warn);background:var(--warn-soft);padding:10px 14px;border-radius:0 4px 4px 0;max-width:68ch;margin:14px 0}
+.trap::before{content:"Be honest here";display:block;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--warn);margin-bottom:2px}
+.say p,.trap p{margin:4px 0}
+.tablewrap{overflow-x:auto;margin:16px 0;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:500}
+.diagram{margin:18px 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow-x:auto}
+.diagram pre.mermaid{margin:0;text-align:center}
+.diagram .cap{font-size:13px;color:var(--muted);margin:8px 0 0;text-align:left}
+details{border:1px solid var(--line);background:var(--panel);border-radius:6px;margin:10px 0;max-width:760px}
+summary{cursor:pointer;padding:11px 14px;font-weight:600}
+summary:focus-visible{outline:2px solid var(--accent)}
+details .body{padding:0 14px 12px}
+.steps{counter-reset:s;list-style:none;padding:0}
+.steps li{counter-increment:s;position:relative;padding-left:44px;margin:12px 0}
+.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);font-family:var(--font-mono);font-size:13px;display:grid;place-items:center}
+.hero{padding:20px 0 8px}
+@media (max-width:900px){.wrap{display:block}nav.rail{position:static;max-height:none;padding:16px 0 0;border-bottom:1px solid var(--line)}nav.rail a{display:inline-block;border:0;padding:3px 10px 3px 0}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+html{scroll-behavior:smooth}
+</style>
+
+<div class="wrap">
+<nav class="rail" aria-label="Chapters">
+  <b>Codium</b>
+  <a href="#pitch">Pitch</a>
+  <a href="#howitworks">A. How it works</a>
+  <a href="#buildorder">B. Build order</a>
+  <a href="#awssteps">C. AWS step by step</a>
+  <a href="#explain">D. Explain it live</a>
+  <a href="#components">F. Component reference</a>
+  <a href="#approach">E. System design method</a>
+  <a href="#requirements">1. Requirements</a>
+  <a href="#estimate">2. Estimation</a>
+  <a href="#api">3. API</a>
+  <a href="#data">4. Data model</a>
+  <a href="#hld">5. High-level design</a>
+  <a href="#auth">6a. Auth</a>
+  <a href="#submit">6b. Submit</a>
+  <a href="#worker">6c. Worker</a>
+  <a href="#sandbox">6d. Sandbox</a>
+  <a href="#leaderboard">6e. Leaderboard</a>
+  <a href="#ws">6f. WebSocket</a>
+  <a href="#frontend">6g. Frontend</a>
+  <a href="#failures">7. Failures</a>
+  <a href="#scale">8. Scaling</a>
+  <a href="#security">9. Security</a>
+  <a href="#aws">10. AWS deploy</a>
+  <a href="#limits">11. Limitations</a>
+  <a href="#qa">12. Questions</a>
+  <a href="#demo">13. Demo</a>
+</nav>
+
+<main>
+<section class="hero" id="pitch">
+  <p class="kicker">Understanding guide and interview study document</p>
+  <h1>Codium: a coding-contest platform, explained from the first decision to the last</h1>
+  <p class="lede">Every explanation below has the real code next to it. Read the "Say it like this" boxes aloud. Read the "Be honest here" boxes before an interviewer finds the gap for you.</p>
+
+  <h3>The 60-second pitch</h3>
+  <div class="say"><p>Codium is a distributed coding-contest platform. A user writes code in the browser and submits it. A Go API saves the submission in Postgres, puts its id on a Redis queue, and replies <code>202</code> straight away. A separate worker pops the id and runs the code in a locked-down Docker container with no network and hard CPU, memory and process limits. It writes the verdict to Postgres, updates a Redis sorted set for the leaderboard, and publishes the change. The API's WebSocket hub is subscribed to that channel and pushes the update to every open browser. It runs on AWS: EC2 for nginx, the API, the worker and Docker; RDS Postgres and ElastiCache Redis in private subnets that only the EC2 security group can reach.</p></div>
+
+  <p>Three ideas to name early:</p>
+  <ol>
+    <li><b>Postgres is the source of truth.</b> Redis holds only derived or transient state: the queue and the ranking. Anything in Redis can be rebuilt.</li>
+    <li><b>Slow work is asynchronous.</b> The API records and enqueues. Judging time never blocks a request.</li>
+    <li><b>The API and the worker share nothing but Postgres and Redis.</b> That is why each one scales on its own.</li>
+  </ol>
+
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  B[Browser React] -->|1 POST submit + JWT| A[Go API]
+  A -->|3 INSERT pending| P[(PostgreSQL)]
+  A -->|4 LPUSH id| Q[(Redis list judge:queue)]
+  A -->|2 202 + id| B
+  Q -->|5 BRPOP| W[Judge worker]
+  W -->|6 claim + load tests| P
+  W -->|7 docker run| D[Docker sandbox]
+  W -->|8 UPDATE verdict| P
+  W -->|9 ZADD + PUBLISH| Z[(Redis ZSET and Pub/Sub)]
+  Z -->|10 subscribe| H[WebSocket hub in API]
+  H -->|11 push| B
+</pre>
+    <p class="cap">The 11 numbered arrows are the same 11 edges the live diagram in the app lights up when you press Submit.</p>
+  </div>
+</section>
+
+<h2 id="howitworks">Part A. How it works, in plain words</h2>
+<p>This part is for reading and understanding, not for answering questions. Follow one submission from the moment you press Submit. Each step says what happens, which file does it, and shows the one snippet that matters.</p>
+
+<div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  A[1 You press Submit] --> B[2 API checks your login token]
+  B --> C[3 API saves the submission as pending in Postgres]
+  C --> D[4 API puts the id on a Redis queue]
+  D --> E[5 API answers 202 right away]
+  D --> F[6 Worker takes the id off the queue]
+  F --> G[7 Worker claims it so nobody else judges it]
+  G --> H[8 Worker runs your code in a locked Docker box]
+  H --> I[9 Worker saves the verdict]
+  I --> J[10 Worker updates the leaderboard in Redis and announces it]
+  J --> K[11 API pushes the change to every open browser]
+</pre>
+<p class="cap">Steps 1 to 5 take milliseconds. Steps 6 to 11 happen in the background while your browser waits.</p>
+</div>
+
+<h3>Step 1. The browser sends the code</h3>
+<p>The React page calls <code>POST /api/submit</code> with your token in the <code>Authorization</code> header. The code lives in <code>web/src/api/judge.ts</code>.</p>
+<script type="text/x-code" data-lang="ts" data-file="web/src/api/judge.ts">
+const { submission_id } = await call('/api/submit', {
+  method: 'POST', token, signal,
+  body: { problem_id, language, code },
+})
+</script>
+
+<h3>Step 2. The API checks who you are</h3>
+<p>A small wrapper (middleware) runs before the handler. It reads the token, verifies the signature and expiry, and stores your user id for the handler to use. A bad or missing token ends here with 401.</p>
+<script type="text/x-code" data-lang="go" data-file="internal/auth/auth.go">
+id, err := ParseToken(secret, tok)
+if err != nil { 401; return }
+next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, id)))
+</script>
+
+<h3>Steps 3 to 5. Save first, queue second, answer immediately</h3>
+<p>The API never judges anything. It writes the submission to Postgres with status <code>pending</code>, pushes only the id onto a Redis list, and replies <code>202 Accepted</code>. Saving first means the submission cannot be lost even if Redis is down.</p>
+<script type="text/x-code" data-lang="go" data-file="internal/api/submit_handlers.go">
+s.pool.QueryRow(ctx, `INSERT INTO submissions (user_id, problem_id, language, code)
+                      VALUES ($1,$2,$3,$4) RETURNING id`, uid, in.ProblemID, in.Language, in.Code).Scan(&id)
+s.rdb.LPush(ctx, JudgeQueue, id)
+writeJSON(w, http.StatusAccepted, map[string]any{"submission_id": id, "status": "pending"})
+</script>
+
+<h3>Step 6. The worker waits on the queue</h3>
+<p>The worker is a separate program. It sits in <code>BRPOP</code>, which blocks inside Redis until an id arrives. No polling loop. It runs several of these loops side by side (goroutines), so several submissions are judged at once.</p>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+res, err := w.RDB.BRPop(ctx, 5*time.Second, queueKey).Result()
+</script>
+
+<h3>Step 7. The worker claims the job</h3>
+<p>One SQL statement flips <code>pending</code> to <code>running</code>, but only if the row is still <code>pending</code>. Postgres runs it atomically, so if two workers ever got the same id, only one would win.</p>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+tag, _ := w.Pool.Exec(ctx,
+  `UPDATE submissions SET status = 'running' WHERE id = $1 AND status = 'pending'`, id)
+if tag.RowsAffected() == 0 { return nil }   // someone else has it
+</script>
+
+<h3>Step 8. Your code runs in a locked box</h3>
+<p>For each test case the worker starts a fresh Docker container that cannot use the network, has a CPU, memory and process limit, a read-only filesystem and a non-root user. Your code reads the test input from stdin. The worker compares what it prints with the expected output.</p>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/sandbox.go">
+"--network=none", "--cpus=1", "--memory=256m", "--memory-swap=256m",
+"--pids-limit=64", "--cap-drop=ALL", "--security-opt=no-new-privileges",
+"--read-only", "--user", "65534:65534",
+</script>
+<p>The outcome decides the verdict: compile failed, timed out, crashed, wrong output, or all tests passed.</p>
+
+<h3>Step 9. The verdict is saved</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+w.Pool.Exec(ctx,
+  `UPDATE submissions SET status = 'done', verdict = $2, time_ms = $3 WHERE id = $1`,
+  id, res.verdict, res.timeMS)
+</script>
+
+<h3>Step 10. The leaderboard is recalculated</h3>
+<p>The worker recounts that one user's solved problems and penalty from Postgres, turns them into a single score, writes it into a Redis sorted set, and publishes a message on a Redis channel.</p>
+<script type="text/x-code" data-lang="go" data-file="internal/leaderboard/leaderboard.go">
+score := float64(st.Solved*solvedWeight - st.Penalty)   // more solved first, then lower penalty
+rdb.ZAdd(ctx, Key, redis.Z{Score: score, Member: st.Username})
+rdb.Publish(ctx, Channel, msg)
+</script>
+
+<h3>Step 11. Browsers are told</h3>
+<p>The API has one subscription to that Redis channel. When a message arrives, the WebSocket hub copies it to every connected browser. The browser treats it as "something changed" and asks the API for the fresh leaderboard.</p>
+<script type="text/x-code" data-lang="go" data-file="internal/ws/hub.go">
+sub := rdb.Subscribe(ctx, leaderboard.Channel)
+for msg := range sub.Channel() { h.broadcast([]byte(msg.Payload)) }
+</script>
+
+<h3>The one rule that explains the design</h3>
+<div class="tablewrap"><table>
+<tr><th>Place</th><th>Holds</th><th>If it is wiped</th></tr>
+<tr><td>PostgreSQL</td><td>Users, problems, tests, every submission and verdict</td><td>Real data loss</td></tr>
+<tr><td>Redis</td><td>The waiting list of ids, the ranking, the live-update channel</td><td>Nothing permanent lost; rebuild from Postgres</td></tr>
+</table></div>
+
+<h2 id="buildorder">Part B. The order we built it in</h2>
+<p>We built it from the inside out, running each layer before adding the next. Every step below ended with something you could run and see working.</p>
+<div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  P1[1 Go server and config] --> P2[2 Postgres and Redis connections]
+  P2 --> P3[3 Schema and seed data]
+  P3 --> P4[4 Register, login, JWT]
+  P4 --> P5[5 Submit and queue]
+  P5 --> P6[6 Worker and sandbox]
+  P6 --> P7[7 Leaderboard and WebSocket]
+  P7 --> P8[8 React frontend]
+  P8 --> P9[9 Move to AWS]
+  P9 --> P10[10 nginx, one address]
+</pre>
+</div>
+<ol class="steps">
+  <li><b>Go server and config.</b> A web server in <code>cmd/api</code> that reads <code>DATABASE_URL</code>, <code>REDIS_URL</code>, <code>JWT_SECRET</code> and <code>PORT</code> from environment variables and refuses to start if a secret is missing. Check: it starts and <code>/healthz</code> answers.</li>
+  <li><b>Postgres and Redis connections.</b> A connection pool and a Redis client, each pinged at startup. <code>/healthz</code> now returns 200 only when both answer. This matches the first git commits ("Add config loader, DB connection pool, and health-checked API" and "Add Redis client and check Redis in /healthz").</li>
+  <li><b>Schema.</b> <code>migrations/001_init.sql</code> creates users, problems, test_cases and submissions with constraints and indexes. <code>002_seed.sql</code> adds the two problems and their tests.</li>
+  <li><b>Auth.</b> Register with bcrypt, login that returns a JWT, and middleware that protects routes. Check: register, log in, call <code>/api/me</code> with the token.</li>
+  <li><b>Submit and queue.</b> The submit endpoint writes the row and pushes the id. Check: submit, then look at the Redis list and the <code>pending</code> row.</li>
+  <li><b>Worker and sandbox.</b> <code>cmd/worker</code> pops ids, claims, runs Docker, writes verdicts. Check: submit and watch the row go <code>pending</code>, <code>running</code>, <code>done</code>.</li>
+  <li><b>Leaderboard and WebSocket.</b> Sorted set, Pub/Sub and the hub. Check: two browser tabs, submit in one, the other updates.</li>
+  <li><b>Frontend.</b> Login, problems, a workspace with an editor, the leaderboard and the live pipeline diagram, built with Vite and React.</li>
+  <li><b>AWS.</b> Part C below.</li>
+  <li><b>nginx.</b> One address serves the site and proxies the API and WebSocket.</li>
+</ol>
+<p>During development the frontend ran on your Mac and talked to the API on EC2 through an SSH tunnel, so port 8080 never had to be opened to the internet:</p>
+<script type="text/x-code" data-lang="bash" data-file="your Mac terminal">
+ssh -i ~/Downloads/codium.pem -N -L 8080:localhost:8080 ubuntu@13.60.3.224
+# now http://localhost:8080 on your Mac reaches the API on the server
+</script>
+
+<h2 id="awssteps">Part C. Going to AWS, step by step</h2>
+<p>All of this was done in one region, <b>eu-north-1 (Stockholm)</b>. Console button labels change over time, so treat the names below as a guide to what to look for. The ideas do not change.</p>
+
+<div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  I((Internet)) -->|port 80| SGE
+  subgraph SGE[Security group: codium-ec2]
+    EC[EC2 server]
+  end
+  subgraph SGD[Security group: codium-db]
+    RDS[(RDS PostgreSQL)]
+  end
+  subgraph SGR[Security group: codium-redis]
+    EL[(ElastiCache)]
+  end
+  EC -->|5432 allowed from codium-ec2 only| RDS
+  EC -->|6379 allowed from codium-ec2 only| EL
+  ME[Your Mac] -->|port 22 from your IP only| EC
+</pre>
+<p class="cap">Security groups are firewalls attached to a resource. The database rules name the EC2 security group as the allowed source, so only that server can connect.</p>
+</div>
+
+<h3>C1. Create the server (EC2)</h3>
+<ol class="steps">
+  <li>In the AWS console, switch the region (top right) to <b>Europe (Stockholm) eu-north-1</b>.</li>
+  <li>Open <b>EC2</b>, then <b>Launch instance</b>.</li>
+  <li>Name it, choose an <b>Ubuntu</b> image and the <b>t3.micro</b> instance type (free-tier eligible at the time).</li>
+  <li>Under <b>Key pair</b>, create a new one named <code>codium</code>. The browser downloads <code>codium.pem</code>. This file is your login. Keep it safe and never commit it.</li>
+  <li>Under <b>Network settings</b>, create a security group (for example <code>codium-ec2</code>) with these inbound rules: SSH (22) from <b>My IP</b>, and HTTP (80) from anywhere. Do not open 8080.</li>
+  <li>Choose a larger root disk than the default (the small default disk filled up once Docker images were pulled), then launch.</li>
+  <li>Copy the <b>public IPv4 address</b> from the instance page. Ours was <code>13.60.3.224</code>.</li>
+</ol>
+<script type="text/x-code" data-lang="bash" data-file="your Mac terminal">
+chmod 400 ~/Downloads/codium.pem
+ssh -i ~/Downloads/codium.pem ubuntu@13.60.3.224
+</script>
+<div class="trap"><p>Without an Elastic IP the public address changes whenever the instance is stopped and started. Allocate one (EC2, Elastic IPs) before you share the link, and associate it with the instance.</p></div>
+
+<h3>C2. Create the database (RDS)</h3>
+<ol class="steps">
+  <li>Open <b>RDS</b>, then <b>Create database</b>, engine <b>PostgreSQL</b>, the smallest burstable class (db.t3.micro or db.t4g.micro).</li>
+  <li>Set a master username and a password. Store the password somewhere private. Do not paste it into chats or commit it.</li>
+  <li>Under connectivity, set <b>Public access: No</b>, in the same VPC as the EC2 server.</li>
+  <li>Create a new security group, for example <code>codium-db</code>. After creation, edit its inbound rules: type PostgreSQL (5432), and as the <b>source choose the security group <code>codium-ec2</code></b>, not an IP address.</li>
+  <li>Wait until the status is <b>Available</b>, then copy the <b>endpoint</b> (a long hostname ending in <code>rds.amazonaws.com</code>).</li>
+</ol>
+
+<h3>C3. Create the cache (ElastiCache)</h3>
+<ol class="steps">
+  <li>Open <b>ElastiCache</b>, create a Valkey (or Redis OSS) cache with the smallest node (a cache.t3 or t4g micro).</li>
+  <li>Keep <b>encryption in transit</b> on. That is why the URL later starts with <code>rediss://</code>.</li>
+  <li>Give it a security group such as <code>codium-redis</code> with an inbound rule: Custom TCP 6379, source the <code>codium-ec2</code> group.</li>
+  <li>Copy the <b>primary endpoint</b> when it is available.</li>
+</ol>
+
+<h3>C4. Prepare the server</h3>
+<p>Over SSH, install what the server needs: Docker (to run submissions), nginx (the front door) and the Postgres client (to apply the schema).</p>
+<script type="text/x-code" data-lang="bash" data-file="on the EC2 server">
+sudo apt-get update
+sudo apt-get install -y docker.io nginx postgresql-client
+sudo usermod -aG docker ubuntu        # lets the ubuntu user run docker; log out and in again
+docker pull python:3.12-alpine        # image used to run Python submissions
+docker pull gcc:13                    # C++
+docker pull golang:1.22-alpine        # Go
+</script>
+<p>If a pull fails with "no space left on device", free space and retry:</p>
+<script type="text/x-code" data-lang="bash" data-file="on the EC2 server">
+docker image prune -a -f
+docker builder prune -a -f
+sudo apt-get clean
+sudo journalctl --vacuum-size=50M
+</script>
+
+<h3>C5. Create the tables</h3>
+<p>Copy the two migration files to the server and run them against RDS. Use <code>sslmode=require</code> so the connection is encrypted. Replace the placeholders with your own values and keep the password out of shell history and chat.</p>
+<script type="text/x-code" data-lang="bash" data-file="your Mac, then the server">
+scp -i ~/Downloads/codium.pem -r migrations ubuntu@13.60.3.224:~/
+
+# on the server:
+psql "postgres://USER:PASSWORD@RDS_ENDPOINT:5432/DBNAME?sslmode=require" -f migrations/001_init.sql
+psql "postgres://USER:PASSWORD@RDS_ENDPOINT:5432/DBNAME?sslmode=require" -f migrations/002_seed.sql
+</script>
+
+<h3>C6. Build the programs on your Mac and copy them over</h3>
+<p>Go compiles to one self-contained file, so the server needs no Go installed. The flags below build a Linux program from a Mac.</p>
+<script type="text/x-code" data-lang="bash" data-file="your Mac terminal, in the project folder">
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o api-linux    ./cmd/api
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o worker-linux ./cmd/worker
+
+scp -i ~/Downloads/codium.pem api-linux worker-linux ubuntu@13.60.3.224:~/
+</script>
+<div class="trap"><p>If you replace a binary that is still running you get "text file busy". Stop the old process first (<code>pkill api-linux</code>), then copy.</p></div>
+
+<h3>C7. Give the programs their settings</h3>
+<p>Create a <code>.env</code> file on the server. It stays only on the server and is listed in <code>.gitignore</code>.</p>
+<script type="text/x-code" data-lang="bash" data-file="~/.env on the server (example shape, fill in your own values)">
+DATABASE_URL=postgres://USER:PASSWORD@RDS_ENDPOINT:5432/DBNAME?sslmode=require
+REDIS_URL=rediss://ELASTICACHE_ENDPOINT:6379
+JWT_SECRET=a-long-random-string
+PORT=8080
+WORKERS=2
+</script>
+<p>The double <code>s</code> in <code>rediss://</code> turns on TLS. Plain <code>redis://</code> is rejected by an encrypted ElastiCache.</p>
+
+<h3>C8. Start the API and the worker</h3>
+<script type="text/x-code" data-lang="bash" data-file="on the EC2 server">
+set -a; . ./.env; set +a              # load the settings into this shell
+chmod +x api-linux worker-linux
+nohup ./api-linux    > api.log    2>&1 &
+nohup ./worker-linux > worker.log 2>&1 &
+
+curl localhost:8080/healthz           # expect {"status":"ok","db":"up","redis":"up"}
+tail -n 5 api.log worker.log
+</script>
+<p><code>nohup</code> keeps them running after you log out. It will not restart them after a reboot or a crash. A systemd service would, and is the proper next step.</p>
+
+<h3>C9. Put nginx in front</h3>
+<p>nginx serves the React files and forwards <code>/api</code>, <code>/ws</code> and <code>/healthz</code> to the API, so the browser sees a single address. The config is <code>deploy/nginx.conf</code> (shown in chapter 10).</p>
+<script type="text/x-code" data-lang="bash" data-file="your Mac, then the server">
+scp -i ~/Downloads/codium.pem deploy/nginx.conf ubuntu@13.60.3.224:~/
+
+# on the server:
+sudo cp ~/nginx.conf /etc/nginx/conf.d/codium.conf
+sudo rm -f /etc/nginx/sites-enabled/default      # remove the stock site so ours is the default
+sudo mkdir -p /var/www/codium
+sudo nginx -t && sudo systemctl restart nginx
+</script>
+
+<h3>C10. Build and publish the website</h3>
+<script type="text/x-code" data-lang="bash" data-file="your Mac terminal">
+cd web && npm run build && cd ..
+tar czf site.tgz -C web/dist .
+scp -i ~/Downloads/codium.pem site.tgz ubuntu@13.60.3.224:~/
+
+ssh -i ~/Downloads/codium.pem ubuntu@13.60.3.224 \
+  'sudo tar xzf ~/site.tgz -C /var/www/codium && rm ~/site.tgz'
+</script>
+
+<h3>C11. Check it from the outside</h3>
+<script type="text/x-code" data-lang="bash" data-file="your Mac terminal">
+curl http://13.60.3.224/healthz
+# then open http://13.60.3.224 in a browser (type http:// yourself; there is no HTTPS)
+</script>
+<ul>
+  <li>Register, log in, submit a solution, watch the diagram light up and the verdict appear.</li>
+  <li>Open the leaderboard in a second tab, submit in the first, and watch the second update without a refresh.</li>
+  <li>On the server, <code>docker ps</code> during a run shows the short-lived container, and <code>tail worker.log</code> shows <code>submission N: Accepted</code>.</li>
+</ul>
+
+<h3>C12. Tidy up</h3>
+<ul>
+  <li>Delete any public rule for port 8080 in the EC2 security group. Only 22 (your IP) and 80 should remain.</li>
+  <li>Allocate and attach an Elastic IP so the address stops changing.</li>
+  <li>When you are finished with the project, stop or delete the EC2 instance, the RDS database and the ElastiCache cache, because all three bill while they exist.</li>
+</ul>
+
+<h3>Problems we hit, and what each one meant</h3>
+<div class="tablewrap"><table>
+<tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+<tr><td>"Failed to fetch" in the browser</td><td>The SSH tunnel to port 8080 was closed</td><td>Reopen the tunnel, or use the nginx site</td></tr>
+<tr><td>New code did not take effect</td><td>The old API process was still answering</td><td>Stop it, copy the new binary, start it</td></tr>
+<tr><td>"text file busy" on scp</td><td>The binary was running</td><td>Stop it first</td></tr>
+<tr><td>Redis connection refused or hangs</td><td>TLS cache with a plain <code>redis://</code> URL</td><td>Use <code>rediss://</code></td></tr>
+<tr><td>Site times out, <code>curl localhost</code> works on the server</td><td>Security group had no port 80 rule</td><td>Add HTTP 80 inbound</td></tr>
+<tr><td>Browser still times out on the IP</td><td>It upgrades to https and port 443 is closed</td><td>Type <code>http://</code> or use a private window</td></tr>
+<tr><td>Register returns 400</td><td>The body needs a username, email and password</td><td>Send all three</td></tr>
+<tr><td>"no space left on device"</td><td>Docker images filled the small disk</td><td>Prune images, or use a bigger disk</td></tr>
+</table></div>
+
+<h2 id="explain">Part D. Explaining it to a technical interviewer</h2>
+<p>Parts A to C teach you the system. This part teaches you how to <em>say</em> it. Read the "Say" blocks aloud until they come out in your own words. They are a script to adapt, not text to recite.</p>
+
+<h3>The method: three depths, and the interviewer picks</h3>
+<div class="tablewrap"><table>
+<tr><th>Depth</th><th>Length</th><th>What it contains</th><th>When to use it</th></tr>
+<tr><td>1. Overview</td><td>30 to 60 seconds</td><td>What it is, the two programs, the two stores</td><td>Always first</td></tr>
+<tr><td>2. Walkthrough</td><td>3 to 5 minutes</td><td>One submission end to end, one sentence of "why" per hop</td><td>When they say "walk me through it"</td></tr>
+<tr><td>3. Under the hood</td><td>1 to 2 minutes per topic</td><td>The mechanism: BRPOP, atomic claim, sandbox flags, Pub/Sub</td><td>Only when they poke at a specific hop</td></tr>
+</table></div>
+<p>Give depth 1, stop, and let them steer. Do not dump depth 3 unprompted. Interviewers learn more from the question they choose to ask than from everything you could have said.</p>
+
+<h3>Draw it in this order</h3>
+<p>Draw while you talk. Add one box at a time so the picture grows with the story.</p>
+<ol class="steps">
+  <li>Browser on the left, then the Go API next to it.</li>
+  <li>Postgres above the API. Label it "truth".</li>
+  <li>Redis list below the API. Label it "queue".</li>
+  <li>The worker to the right of the queue, then a Docker box under the worker.</li>
+  <li>A second Redis box (sorted set and Pub/Sub) and the WebSocket hub inside the API, with the arrow back to the browser.</li>
+</ol>
+
+<h3>The script, from the beginning</h3>
+
+<h4>0. Open with the problem, not the technology</h4>
+<div class="say"><p>It's a coding-contest platform: you write code in the browser, it runs against hidden tests, you get a verdict, and a leaderboard updates live. The interesting problem is that you're running strangers' code, which is slow and dangerous, while keeping the website fast and not losing anyone's submission.</p></div>
+<p><b>Why this opening works:</b> it states the constraints (slow, untrusted, must not lose data), so every later decision sounds like a consequence and not a choice from a trend list.</p>
+
+<h4>1. The split</h4>
+<div class="say"><p>I split it into two programs. The API handles requests and never runs user code. A separate worker does the judging. They share nothing except two stores. Postgres is the source of truth. Redis holds the queue, the ranking and live notifications, and everything in Redis can be rebuilt from Postgres.</p></div>
+<p><b>If they push:</b> "Why separate processes?" Answer: independent scaling and failure isolation. A runaway judge can't take down the API, and judging capacity is sized by Little's law (arrival rate times judge time), not by web traffic.</p>
+
+<h4>2. Authentication, briefly</h4>
+<div class="say"><p>Passwords are bcrypt-hashed. Login returns a signed JWT with the user id and a 24-hour expiry, so any API instance can verify it with the shared secret and I need no session store. On verify I pin the algorithm and require an expiry.</p></div>
+<script type="text/x-code" data-lang="go" data-file="the one line worth knowing by heart (internal/auth/auth.go)">
+jwt.ParseWithClaims(token, &claims, keyFunc,
+    jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
+</script>
+<p><b>If they push:</b> "Downsides of JWT?" You can't revoke a token before it expires, and a token in localStorage is exposed to XSS. Fixes: short expiry with refresh, httpOnly cookies, or a denylist in Redis.</p>
+
+<h4>3. The submit request</h4>
+<div class="say"><p>When you submit, the API validates the input, inserts a row in Postgres with status <code>pending</code>, pushes only the submission id onto a Redis list, and returns <code>202</code> immediately. I write to Postgres first so that if Redis is down the submission is delayed, never lost. The queue holds only the id, so there's a single copy of the code and the worker always reads the current row.</p></div>
+<script type="text/x-code" data-lang="go" data-file="internal/api/submit_handlers.go">
+INSERT INTO submissions (...) VALUES ($1,$2,$3,$4) RETURNING id    // 1. durable
+s.rdb.LPush(ctx, JudgeQueue, id)                                   // 2. wake-up note
+writeJSON(w, http.StatusAccepted, ...)                             // 3. answer now
+</script>
+<p><b>If they push:</b> "What if the API dies between the INSERT and the LPUSH?" The row stays <code>pending</code> and is never queued. I know it. The lightweight fix is a sweeper that re-queues old pending rows. The rigorous fix is a transactional outbox. I haven't built either. Say that plainly, then say which one you would build first and why.</p>
+
+<h4>4. The queue and the blocking pop</h4>
+<div class="say"><p>The worker blocks on <code>BRPOP</code>. A normal pop on an empty list returns at once, so you'd poll with sleeps. With <code>BRPOP</code> Redis parks the connection and wakes the worker the moment a push arrives, so there's no polling and the latency is tiny. Redis is single-threaded for commands, so each element goes to exactly one waiting client. I use a 5-second timeout so the loop can notice a shutdown signal.</p></div>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+res, err := w.RDB.BRPop(ctx, 5*time.Second, queueKey).Result()
+</script>
+<p><b>If they push:</b> "What if the worker crashes after the pop?" The id is gone from Redis, because a list is at-most-once. Postgres still has the row, stuck in <code>running</code>. A sweeper fixes it. Redis Streams with consumer groups and acknowledgements would give at-least-once delivery properly. Then say why you accepted this: it's a small system, and the data is never lost.</p>
+
+<h4>5. The claim</h4>
+<div class="say"><p>Before judging, the worker claims the job with a conditional update: set <code>running</code> where status is still <code>pending</code>. Postgres makes that atomic, so even if an id were delivered twice, exactly one worker sees one affected row and the other does nothing. I don't try for exactly-once delivery, which doesn't exist across two systems. I make the processing idempotent instead.</p></div>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+UPDATE submissions SET status='running' WHERE id=$1 AND status='pending'
+if tag.RowsAffected() == 0 { return nil }
+</script>
+
+<h4>6. The sandbox</h4>
+<div class="say"><p>Each test case runs in a fresh Docker container with no network, one CPU, a hard memory cap with swap disabled, a process limit against fork bombs, all capabilities dropped, a read-only filesystem, a non-root user, and the code mounted read-only. A wall-clock timeout kills it. Output is capped at 1 MB. The verdict follows from the result: compile failed, timed out, non-zero exit, output mismatch, or all tests passed.</p></div>
+<p><b>Detail that shows you built it:</b> cancelling the context only kills the docker <em>client</em>, not the container, so I name every container and remove it with <code>docker rm -f</code>.</p>
+<p><b>If they push:</b> "Is that secure enough?" Containers share the host kernel, so a kernel exploit is the remaining risk. For hostile production traffic I'd add gVisor or Firecracker and seccomp profiles, and run judge hosts in an isolated subnet. Also be ready to say that wall-clock time includes about 0.3 to 0.5 seconds of Docker start-up (I add a 1.5-second grace) and that memory is limited but not measured.</p>
+
+<h4>7. Verdict, then leaderboard</h4>
+<div class="say"><p>The worker saves the verdict first, so the leaderboard can never undo it. Then it recomputes that user's standing from Postgres: problems solved, and 20 penalty points for each judged wrong try before the first accepted one. It packs that into one number, solved times a million minus penalty, and writes it to a Redis sorted set. I recompute and overwrite instead of incrementing, so a retry can't double-count, and the whole board can be rebuilt from Postgres if Redis is lost.</p></div>
+<script type="text/x-code" data-lang="go" data-file="internal/leaderboard/leaderboard.go">
+score := float64(st.Solved*1_000_000 - st.Penalty)
+rdb.ZAdd(ctx, Key, redis.Z{Score: score, Member: st.Username})
+rdb.Publish(ctx, Channel, msg)
+</script>
+<p><b>If they push:</b> "Why a sorted set?" Updates are O(log n), and the top-k read is already ordered, so there's no <code>ORDER BY</code> over all submissions on every page load. The per-problem cells come from Postgres in one <code>= ANY($1)</code> query, so there's no N+1.</p>
+
+<h4>8. Live updates</h4>
+<div class="say"><p>The worker publishes to a Redis channel. Each API instance holds one subscription and its WebSocket hub copies the message to its connected browsers. I used Pub/Sub because the worker doesn't know which API instance holds which socket, and this works unchanged with several API servers. Each client has a bounded buffer, and a slow client is dropped so it can't stall the broadcast. The browser treats the message only as a signal and refetches the board.</p></div>
+<p><b>If they push:</b> "Pub/Sub loses messages." Yes: it's fire-and-forget. That's acceptable here because the message is only an invalidate signal, and the client refetches the whole board on reconnect. If I needed guaranteed delivery I'd use Redis Streams.</p>
+
+<h4>9. Close with deployment and honesty</h4>
+<div class="say"><p>It runs on AWS: one EC2 instance with nginx, the API, the worker and Docker, and RDS and ElastiCache in private subnets reachable only from the instance's security group, with TLS to Redis. The gaps I know about: it's HTTP only, there's no sweeper for stuck jobs, there's one global leaderboard with no contest timer, and I haven't load-tested scale-out. I'd fix those in that order.</p></div>
+
+<h3>Questions that come up, and where to point them</h3>
+<div class="tablewrap"><table>
+<tr><th>They ask</th><th>Go to</th></tr>
+<tr><td>"How would you scale it?"</td><td>Workers first (judging is the cost), then more API instances (stateless thanks to JWT, WebSockets via Pub/Sub), then read replica and pooling, then Streams or SQS.</td></tr>
+<tr><td>"What breaks first?"</td><td>The single EC2 box: Docker start-up and CPU. Judging is the bottleneck, not the API.</td></tr>
+<tr><td>"What if Redis dies?"</td><td>Nothing is lost: every submission is in Postgres. Re-queue pending rows and rebuild the board from Postgres.</td></tr>
+<tr><td>"What did you find hardest?"</td><td>Timeouts: killing the container by name. Or deciding what an infrastructure failure means (retry, not a verdict).</td></tr>
+<tr><td>"What would you change?"</td><td>Outbox plus sweeper, Streams, real CPU accounting, HTTPS and a domain, contest timers.</td></tr>
+<tr><td>"Show me the code for X."</td><td>Open the file named in the snippet header in chapters 6a to 6g. Know the file for each hop.</td></tr>
+</table></div>
+
+<h3>Habits that make you sound senior</h3>
+<ul>
+  <li><b>Say the why before the what.</b> "I save first because..." beats "I save first."</li>
+  <li><b>Name the trade-off yourself.</b> "That's at-most-once, and here's the fix" beats being caught on it.</li>
+  <li><b>Separate what you built from what you'd build.</b> "I haven't built the sweeper; this is how I would." Never imply a feature exists that doesn't.</li>
+  <li><b>Use numbers you can defend.</b> The 601 ms measurement is real. The capacity estimates are assumptions, so call them that.</li>
+  <li><b>If you don't know, reason aloud.</b> "I haven't used that, but I'd expect..." is better than guessing confidently.</li>
+  <li><b>Check in.</b> After each depth, ask "want me to go deeper on any part?"</li>
+</ul>
+
+<h3>Timing plans</h3>
+<div class="tablewrap"><table>
+<tr><th>You have</th><th>Cover</th></tr>
+<tr><td>2 minutes</td><td>Steps 0, 1, 3 and 9 only: the problem, the split, save-then-queue-then-202, the known gaps.</td></tr>
+<tr><td>5 minutes</td><td>Add 4, 5, 6 and 8: BRPOP, the claim, the sandbox, Pub/Sub.</td></tr>
+<tr><td>10 to 15 minutes</td><td>All of it, with the live demo from chapter 13 running alongside the diagram.</td></tr>
+</table></div>
+<div class="trap"><p>Rehearse the 2-minute version out loud once, with a timer, before the interview. Reading is not the same as being able to say it.</p></div>
+
+<h2 id="components">Part F. Component reference: what each part is, what it receives and sends</h2>
+<p>Ten components. For each: its job, what comes in, what goes out, how it works, how it was set up, and the key code. The wiring table comes first so you can see the whole graph at once.</p>
+
+<h3>The wiring, in one table</h3>
+<div class="tablewrap"><table>
+<tr><th>#</th><th>From</th><th>To</th><th>What travels</th><th>Protocol</th></tr>
+<tr><td>1</td><td>Browser</td><td>nginx</td><td>Page files; <code>/api/*</code> requests; WebSocket upgrade</td><td>HTTP :80</td></tr>
+<tr><td>2</td><td>nginx</td><td>Go API</td><td><code>/api/</code>, <code>/ws/</code>, <code>/healthz</code> proxied</td><td>HTTP localhost:8080</td></tr>
+<tr><td>3</td><td>Go API</td><td>Postgres</td><td>users, submissions INSERT; reads</td><td>SQL over TCP :5432</td></tr>
+<tr><td>4</td><td>Go API</td><td>Redis list</td><td><code>LPUSH judge:queue &lt;id&gt;</code></td><td>RESP over TLS :6379</td></tr>
+<tr><td>5</td><td>Go API</td><td>Browser</td><td><code>202 + submission_id</code>, later JSON for status and leaderboard</td><td>HTTP</td></tr>
+<tr><td>6</td><td>Worker</td><td>Redis list</td><td><code>BRPOP judge:queue</code> returns an id</td><td>RESP</td></tr>
+<tr><td>7</td><td>Worker</td><td>Postgres</td><td>claim UPDATE, load code and tests, write verdict, recompute standings</td><td>SQL</td></tr>
+<tr><td>8</td><td>Worker</td><td>Docker sandbox</td><td>code and test input in; stdout, exit code out</td><td>docker CLI</td></tr>
+<tr><td>9</td><td>Worker</td><td>Redis ZSET + Pub/Sub</td><td><code>ZADD leaderboard</code> and <code>PUBLISH</code></td><td>RESP</td></tr>
+<tr><td>10</td><td>Redis Pub/Sub</td><td>WebSocket hub (in API)</td><td>the "something changed" message</td><td>RESP subscribe</td></tr>
+<tr><td>11</td><td>WS hub</td><td>Browser</td><td>the same message, per connection</td><td>WebSocket</td></tr>
+</table></div>
+<p>The API and the worker never talk to each other directly. They share only Postgres and Redis. That is what lets them scale and fail independently.</p>
+
+<h3>1. Browser (React + Vite app)</h3>
+<ul>
+<li><b>Job:</b> the editor, the submit button, the verdict, the leaderboard and the live pipeline diagram.</li>
+<li><b>Receives:</b> static files from nginx; JSON from the API; WebSocket messages.</li>
+<li><b>Sends:</b> <code>POST /api/register</code>, <code>/api/login</code>, <code>/api/submit</code> (with <code>Authorization: Bearer &lt;JWT&gt;</code>), polls <code>GET /api/submissions/{id}</code> every 700 ms, <code>GET /api/leaderboard</code>, opens <code>/ws/leaderboard</code>.</li>
+<li><b>How it works:</b> after the 202 it polls status, and a WebSocket push wakes the poll early. If no push arrives within 4 s it shows a red "no live push" state. The Pipeline diagram lights nodes only from events the browser actually saw.</li>
+<li><b>Setup:</b> <code>npm run build</code> produces <code>dist/</code>, which is copied to <code>/var/www/codium</code> on EC2. In dev the API is <code>localhost:8080</code> through an SSH tunnel; in production it is <code>window.location.origin</code>.</li>
+<li><b>Connected to:</b> nginx only. It never talks to Postgres or Redis.</li>
+</ul>
+<script type="text/x-code" data-lang="ts" data-file="web/src/api/http.ts">
+export const API_BASE: string =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8080' : window.location.origin)
+export const WS_BASE = API_BASE.replace(/^http/, 'ws')
+</script>
+
+<h3>2. nginx (front door on EC2)</h3>
+<ul>
+<li><b>Job:</b> serve the built site and forward API and WebSocket traffic, so the browser sees one origin on port 80 and port 8080 stays closed to the internet.</li>
+<li><b>Receives:</b> all public HTTP from the browser.</li>
+<li><b>Sends:</b> files from <code>/var/www/codium</code> (with SPA fallback to <code>index.html</code>), or a proxied request to <code>127.0.0.1:8080</code>.</li>
+<li><b>How it works:</b> location blocks for <code>/api/</code>, <code>/ws/</code> (with the <code>Upgrade</code> headers and a 3600 s read timeout so idle sockets survive) and <code>/healthz</code>.</li>
+<li><b>Setup:</b> install nginx on the instance, put the server block from <code>deploy/nginx.conf</code> in place, reload nginx. The security group must allow port 80.</li>
+<li><b>Connected to:</b> the browser (in) and the Go API (out).</li>
+</ul>
+<p><i>Honesty note:</i> the exact install steps (conf.d vs sites-enabled) are the standard ones, not confirmed against what you typed. The config file in the repo is the source of truth.</p>
+
+<h3>3. Go API (<code>cmd/api</code>, <code>internal/api</code>)</h3>
+<ul>
+<li><b>Job:</b> authenticate, validate, record, enqueue, answer fast. It never runs user code.</li>
+<li><b>Receives:</b> proxied HTTP from nginx: register, login, list problems, submit, get submission, leaderboard, health.</li>
+<li><b>Sends:</b> SQL to Postgres; <code>LPUSH</code> to Redis; JSON back; it also hosts the WebSocket hub (component 10).</li>
+<li><b>How it works:</b> Go 1.22 <code>ServeMux</code> method+path patterns, auth middleware that puts the user id in the request context, parameterised SQL, <code>MaxBytesReader</code> of 1 MB, code capped at 64 KB. Unique violation maps to 409, foreign-key violation to 404. <code>getSubmission</code> filters by <code>user_id</code> so you can't read someone else's code.</li>
+<li><b>Setup:</b> cross-compile and copy up, then run with env vars <code>DATABASE_URL</code>, <code>REDIS_URL</code>, <code>JWT_SECRET</code>, <code>PORT</code>.</li>
+<li><b>Connected to:</b> nginx (in), Postgres, Redis (out).</li>
+</ul>
+<script type="text/x-code" data-lang="bash" data-file="build and run">
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o api-linux ./cmd/api
+scp -i ~/Downloads/codium.pem api-linux ubuntu@13.60.3.224:~
+# on the server (values come from env, never from git):
+nohup ./api-linux > api.log 2>&1 &
+</script>
+<script type="text/x-code" data-lang="go" data-file="internal/api/submit_handlers.go">
+err := s.pool.QueryRow(ctx,
+    `INSERT INTO submissions (user_id, problem_id, language, code)
+     VALUES ($1,$2,$3,$4) RETURNING id`, uid, in.ProblemID, in.Language, in.Code).Scan(&id)
+...
+s.rdb.LPush(ctx, JudgeQueue, id)
+writeJSON(w, http.StatusAccepted, map[string]any{"submission_id": id, "status": "pending"})
+</script>
+
+<h3>4. Auth (<code>internal/auth</code>, inside the API)</h3>
+<ul>
+<li><b>Job:</b> turn a password into a token, and a token into a user id.</li>
+<li><b>Receives:</b> username and password on login; a bearer token on every protected request.</li>
+<li><b>Sends:</b> a signed JWT (HS256, user id in <code>sub</code>, 24 h expiry); the user id into the request context.</li>
+<li><b>How it works:</b> bcrypt hashes the password (72-byte limit). Verify pins the algorithm and requires an expiry. Login returns the same error for unknown user and wrong password.</li>
+<li><b>Setup:</b> one secret, <code>JWT_SECRET</code>, shared by every API instance. That shared secret is why no session store is needed.</li>
+<li><b>Connected to:</b> Postgres (the <code>users</code> table) via the API.</li>
+</ul>
+<script type="text/x-code" data-lang="go" data-file="internal/auth/auth.go">
+jwt.ParseWithClaims(token, &claims, keyFunc,
+    jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
+</script>
+
+<h3>5. PostgreSQL on RDS (source of truth)</h3>
+<ul>
+<li><b>Job:</b> durable storage for users, problems, tests, submissions and verdicts.</li>
+<li><b>Receives:</b> SQL from the API and the worker.</li>
+<li><b>Sends:</b> rows back. It sends nothing on its own.</li>
+<li><b>How it works:</b> constraints enforce the rules (UNIQUE usernames, CHECK on status and verdict). <code>status</code> (pending, running, done) is separate from <code>verdict</code>. A composite index serves "my submissions for this problem, newest first", and a partial index covers only unfinished rows.</li>
+<li><b>Setup:</b> create the RDS instance, private (no public access), attach a security group that allows 5432 only from the EC2 security group, then run <code>migrations/001_init.sql</code> and seed problems. Never paste the master password in chat or git.</li>
+<li><b>Connected to:</b> API and worker only.</li>
+</ul>
+<script type="text/x-code" data-lang="sql" data-file="migrations/001_init.sql">
+status  TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','done')),
+verdict TEXT CHECK (verdict IN ('Accepted','Wrong Answer','Time Limit Exceeded','Runtime Error','Compile Error')),
+CREATE INDEX submissions_user_problem_idx ON submissions (user_id, problem_id, created_at DESC);
+CREATE INDEX submissions_status_idx ON submissions (status) WHERE status &lt;&gt; 'done';
+</script>
+
+<h3>6. Redis list <code>judge:queue</code> (the job queue)</h3>
+<ul>
+<li><b>Job:</b> hand submission ids from the API to the workers.</li>
+<li><b>Receives:</b> <code>LPUSH</code> of an id from the API.</li>
+<li><b>Sends:</b> an id to exactly one worker that is blocked in <code>BRPOP</code>.</li>
+<li><b>How it works:</b> push on the left, pop from the right gives FIFO. Redis runs commands on a single thread, so each element goes to one client. A blocked <code>BRPOP</code> is woken by the push, so there is no polling. It is at-most-once: an id popped by a worker that then crashes is gone from Redis (Postgres still has the row).</li>
+<li><b>Setup:</b> an ElastiCache (Redis/Valkey) node in the same VPC, security group open on 6379 only to the EC2 security group, and a <code>rediss://</code> URL because in-transit encryption is on.</li>
+<li><b>Connected to:</b> API (producer), worker (consumer).</li>
+</ul>
+
+<h3>7. Judge worker (<code>cmd/worker</code>, <code>internal/judge</code>)</h3>
+<ul>
+<li><b>Job:</b> take an id, run the code against the tests, write the verdict, update the ranking.</li>
+<li><b>Receives:</b> an id from <code>BRPOP</code>; the code and tests from Postgres.</li>
+<li><b>Sends:</b> the claim and verdict to Postgres; <code>docker run</code> commands; <code>ZADD</code> and <code>PUBLISH</code> to Redis.</li>
+<li><b>How it works:</b> <code>WORKERS</code> goroutines each loop on <code>BRPOP</code> with a 5 s timeout, so each can notice shutdown. It claims the job with a conditional UPDATE, so a duplicate delivery does nothing. An infrastructure failure puts the row back to <code>pending</code> instead of inventing a verdict. On SIGTERM it stops taking jobs but finishes the one in flight.</li>
+<li><b>Setup:</b> cross-compile <code>./cmd/worker</code>, run on the same EC2 instance (it needs Docker), same env vars plus <code>WORKERS</code>. The ubuntu user must be allowed to run docker.</li>
+<li><b>Connected to:</b> Redis list, Postgres, Docker, Redis ZSET and Pub/Sub.</li>
+</ul>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+res, err := w.RDB.BRPop(ctx, 5*time.Second, queueKey).Result()
+...
+tag, _ := w.Pool.Exec(ctx,
+    `UPDATE submissions SET status='running' WHERE id=$1 AND status='pending'`, id)
+if tag.RowsAffected() == 0 { return nil } // someone else has it
+</script>
+
+<h3>8. Docker sandbox (<code>internal/judge/sandbox.go</code>)</h3>
+<ul>
+<li><b>Job:</b> run one untrusted program on one test input, safely.</li>
+<li><b>Receives:</b> the source file mounted read-only at <code>/work</code>, and the test input on stdin.</li>
+<li><b>Sends:</b> stdout (capped at 1 MB), the exit code, and whether it timed out.</li>
+<li><b>How it works:</b> a fresh container per test with no network, 1 CPU, a memory cap with swap equal to memory, a pids limit, all capabilities dropped, read-only root, a tmpfs <code>/tmp</code>, and a non-root user. Containers are named so a timeout can <code>docker rm -f</code> them. Exit 137 means the memory kill and is reported as Runtime Error. Output is compared after trimming trailing whitespace; the loop stops at the first failing test.</li>
+<li><b>Setup:</b> install Docker on the instance and pull the language images (<code>gcc:13</code>, <code>golang:1.22-alpine</code>, <code>python:3.12-alpine</code>). <b>Not yet done on your box:</b> the disk filled once, so C++ and Go are unverified.</li>
+<li><b>Connected to:</b> the worker only.</li>
+</ul>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/sandbox.go">
+"--network=none",
+"--cpus=1", "--memory=256m", "--memory-swap=256m",
+"--pids-limit=64",
+"--cap-drop=ALL", "--security-opt=no-new-privileges",
+"--read-only", "--tmpfs", "/tmp:rw,size=16m",
+"--user", "65534:65534",
+</script>
+
+<h3>9. Redis sorted set + Pub/Sub (leaderboard)</h3>
+<ul>
+<li><b>Job:</b> hold the ranking, and announce changes.</li>
+<li><b>Receives:</b> <code>ZADD</code> with a user's score; <code>PUBLISH</code> from the worker.</li>
+<li><b>Sends:</b> top-k via <code>ZREVRANGE</code> to the API; each published message to every subscriber.</li>
+<li><b>How it works:</b> score = solved × 1,000,000 − penalty (20 per judged wrong try before the first accepted). It is recomputed from Postgres and overwritten, never incremented, so retries are safe and the board can be rebuilt. Pub/Sub is fire-and-forget; the message is only an invalidate signal.</li>
+<li><b>Setup:</b> the same ElastiCache node as the queue; no extra setup.</li>
+<li><b>Connected to:</b> worker (writes), API (reads and subscribes).</li>
+</ul>
+<script type="text/x-code" data-lang="go" data-file="internal/leaderboard/leaderboard.go">
+score := float64(st.Solved*solvedWeight - st.Penalty)
+rdb.ZAdd(ctx, Key, redis.Z{Score: score, Member: st.Username})
+rdb.Publish(ctx, Channel, msg)
+</script>
+
+<h3>10. WebSocket hub (<code>internal/ws</code>, inside the API)</h3>
+<ul>
+<li><b>Job:</b> push "the board changed" to every connected browser.</li>
+<li><b>Receives:</b> messages from the Redis subscription (one per API instance); WebSocket connections from browsers via nginx.</li>
+<li><b>Sends:</b> the message to every client.</li>
+<li><b>How it works:</b> one <code>writePump</code> and one <code>readPump</code> per connection, a 30 s ping and 60 s pong. Each client has a send buffer of 16; if it fills, that client is dropped, so one slow browser can't stall the rest. Origin checking is open (a known gap).</li>
+<li><b>Setup:</b> nothing separate. It starts with the API; nginx must forward the <code>Upgrade</code> headers.</li>
+<li><b>Connected to:</b> Redis (in), browsers (out).</li>
+</ul>
+<script type="text/x-code" data-lang="go" data-file="internal/ws/hub.go">
+sub := rdb.Subscribe(ctx, leaderboard.Channel)
+for msg := range sub.Channel() { h.broadcast([]byte(msg.Payload)) }
+...
+select {
+case c.send &lt;- msg:
+default: delete(h.clients, c); close(c.send)
+}
+</script>
+
+<h3>The infrastructure around them</h3>
+<div class="tablewrap"><table>
+<tr><th>Piece</th><th>Role</th><th>Setup</th></tr>
+<tr><td>EC2 t3.micro (Ubuntu, eu-north-1)</td><td>Runs nginx, API, worker and Docker</td><td>Launch with key pair <code>codium</code>; user <code>ubuntu</code>; public IP 13.60.3.224 (changes on restart until you attach an Elastic IP)</td></tr>
+<tr><td>Security group (EC2)</td><td>Firewall</td><td>22 from your IP only, 80 from anywhere, <b>delete the public 8080 rule</b></td></tr>
+<tr><td>Security group (RDS, ElastiCache)</td><td>Only the EC2 group may connect</td><td>Inbound 5432 and 6379 with source set to the EC2 security group (security-group referencing, not IPs)</td></tr>
+<tr><td>Process management</td><td>Keeps API and worker running</td><td>Currently <code>nohup</code>: no auto-restart. systemd would fix that</td></tr>
+</table></div>
+
+<div class="say"><p>To say it in 20 seconds: the browser talks to nginx; nginx forwards to a stateless Go API; the API writes to Postgres and pushes an id onto a Redis list; a worker pops it, claims it in Postgres, runs it in a locked-down Docker container, saves the verdict, updates a Redis sorted set and publishes; the API's WebSocket hub relays that to the browser.</p></div>
+
+<h2 id="approach">How to approach any system design question (and how Codium followed it)</h2>
+<p>Interviewers grade the process as much as the answer. Use the same order every time. Say each step's name out loud as you start it, so the interviewer can follow you.</p>
+<div class="tablewrap"><table>
+<tr><th>Step</th><th>What you do</th><th>What it looked like for Codium</th></tr>
+<tr><td>1. Requirements</td><td>Ask what the system must do and how well. Split functional from non-functional. Agree on what is out of scope.</td><td>Submit code, get a verdict, see a live leaderboard. Must be safe against hostile code and must not lose a submission.</td></tr>
+<tr><td>2. Estimation</td><td>Rough numbers for users, requests per second, storage, and the slowest step.</td><td>The slow step is judging, so the worker count follows from judge time, not from API load.</td></tr>
+<tr><td>3. API</td><td>List the endpoints, who may call them, and what they return.</td><td>Register, login, submit (202), poll a submission, leaderboard, WebSocket.</td></tr>
+<tr><td>4. Data model</td><td>Tables, keys, constraints, indexes. Decide where the truth lives.</td><td>Four tables. Postgres is the truth; Redis is derived.</td></tr>
+<tr><td>5. High-level design</td><td>Boxes and arrows for the happy path. Name every component's single job.</td><td>The diagram above.</td></tr>
+<tr><td>6. Deep dives</td><td>Pick the hard parts and go deep: concurrency, consistency, security.</td><td>Atomic claim, sandbox, idempotent leaderboard, Pub/Sub fan-out.</td></tr>
+<tr><td>7. Failure modes</td><td>For each component ask: what if it dies, is slow, or sends a duplicate?</td><td>Redis down, worker crash, API crash between two writes.</td></tr>
+<tr><td>8. Scaling</td><td>Find the first bottleneck, then the next. Say what you would add and when.</td><td>Workers first, then API instances, then DB reads.</td></tr>
+<tr><td>9. Trade-offs</td><td>State what you gave up and why. Name the known gaps yourself.</td><td>Limitations table in chapter 11.</td></tr>
+</table></div>
+<div class="say"><p>Before I draw anything, I want to confirm the requirements and which part is hardest. For a judge, the hard part is running untrusted code safely and not losing submissions, so that is where I will spend my time.</p></div>
+
+<h2 id="requirements">1. Requirements</h2>
+<h3>Functional</h3>
+<ul>
+  <li>Users register, log in, and stay logged in.</li>
+  <li>A user submits code in Python, C++ or Go for a problem and receives a verdict: Accepted, Wrong Answer, Time Limit Exceeded, Runtime Error or Compile Error.</li>
+  <li>A leaderboard ranks users by problems solved, then by penalty, and updates live.</li>
+</ul>
+<h3>Non-functional</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Requirement</th><th>Design response</th></tr>
+<tr><td>Safety</td><td>Untrusted code must not harm the host or reach internal services.</td><td>One locked-down container per test, no network, hard limits.</td></tr>
+<tr><td>Durability</td><td>A submission must not be lost.</td><td>Write to Postgres before queueing.</td></tr>
+<tr><td>Latency</td><td>Submit returns fast; the verdict appears within seconds.</td><td>Async queue, 202 reply, WebSocket push.</td></tr>
+<tr><td>Correctness</td><td>One submission is judged once; the ranking is right even after retries.</td><td>Atomic claim; recomputed (idempotent) leaderboard.</td></tr>
+<tr><td>Scalability</td><td>Burst of submissions near a deadline.</td><td>Queue absorbs bursts; workers scale independently.</td></tr>
+<tr><td>Availability</td><td>A dead worker or Redis blip must not corrupt data.</td><td>State lives in Postgres; Redis is rebuildable.</td></tr>
+</table></div>
+<h3>Out of scope (say this on purpose)</h3>
+<p>Contest timers and multiple contests, plagiarism checks, an in-browser debugger, per-test-case results in the UI, and HTTPS with a custom domain.</p>
+
+<h2 id="estimate">2. Back-of-envelope estimation</h2>
+<p>These are assumptions for the design exercise. They are not measurements of the deployed site. The point is to show how you reason, and to find the real bottleneck.</p>
+<div class="tablewrap"><table>
+<tr><th>Quantity</th><th>Assumption</th><th>Result</th></tr>
+<tr><td>Contestants online</td><td>500</td><td></td></tr>
+<tr><td>Submit rate at peak</td><td>each user submits once per 2 minutes</td><td>500 / 120 s, about 4 submissions per second</td></tr>
+<tr><td>Judge time per submission</td><td>Python, 3 tests at about 0.5 s each (measured: a 3-test Wrong Answer took 601 ms)</td><td>about 1.5 s; compiled languages add a compile step</td></tr>
+<tr><td>Concurrent judge slots needed</td><td>arrival rate × service time (Little's law)</td><td>4/s × 1.5 s, about 6 containers running at once</td></tr>
+<tr><td>Storage</td><td>64 KB code cap; typical code is 1 KB</td><td>1 million submissions is about 1 GB</td></tr>
+<tr><td>Leaderboard size</td><td>500 members in a sorted set</td><td>a few tens of KB in Redis</td></tr>
+<tr><td>WebSocket connections</td><td>500 viewers</td><td>trivial for one Go process (goroutines are cheap)</td></tr>
+</table></div>
+<div class="say"><p>The API load is tiny: four requests a second. The expensive part is judging, because every submission occupies a container for seconds. So the system is sized by worker capacity, and the queue is what protects the API from that cost.</p></div>
+<p>Little's law is <code>concurrency = arrival rate × time in system</code>. It is the one formula worth memorising for interviews.</p>
+
+<h2 id="api">3. API design</h2>
+<div class="tablewrap"><table>
+<tr><th>Method and path</th><th>Auth</th><th>Purpose and result</th></tr>
+<tr><td>POST /api/auth/register</td><td>none</td><td>username, email, password → 201 + JWT, or 409 if taken</td></tr>
+<tr><td>POST /api/auth/login</td><td>none</td><td>username, password → 200 + JWT, or 401</td></tr>
+<tr><td>GET /api/me</td><td>JWT</td><td>current user</td></tr>
+<tr><td>GET /api/problems, /api/problems/{slug}</td><td>none</td><td>list and detail</td></tr>
+<tr><td>POST /api/submit</td><td>JWT</td><td>problem_id, language, code → <b>202</b> + submission_id</td></tr>
+<tr><td>GET /api/submissions/{id}</td><td>JWT, owner only</td><td>status, verdict, time_ms</td></tr>
+<tr><td>GET /api/leaderboard</td><td>none</td><td>top standings with a per-problem grid</td></tr>
+<tr><td>GET /ws/leaderboard</td><td>none</td><td>WebSocket stream of standing changes</td></tr>
+<tr><td>GET /healthz</td><td>none</td><td>200 only if Postgres and Redis both answer</td></tr>
+</table></div>
+<p>The routes are registered with Go 1.22 method-and-path patterns, so no router library is needed:</p>
+<script type="text/x-code" data-lang="go" data-file="internal/api/api.go">
+mux.HandleFunc("GET /healthz", s.health)
+mux.HandleFunc("POST /api/auth/register", s.register)
+mux.HandleFunc("POST /api/auth/login", s.login)
+mux.Handle("GET /api/me", requireAuth(http.HandlerFunc(s.me)))
+mux.Handle("GET /ws/leaderboard", s.hub)
+mux.HandleFunc("GET /api/problems", s.listProblems)
+mux.HandleFunc("GET /api/problems/{slug}", s.getProblem)
+mux.HandleFunc("GET /api/leaderboard", s.getLeaderboard)
+mux.Handle("POST /api/submit", requireAuth(http.HandlerFunc(s.submit)))
+mux.Handle("GET /api/submissions/{id}", requireAuth(http.HandlerFunc(s.getSubmission)))
+</script>
+<p>The health check proves both dependencies, so a load balancer can take an unhealthy instance out of rotation:</p>
+<script type="text/x-code" data-lang="go" data-file="internal/api/api.go">
+func (s *Server) health(w http.ResponseWriter, r *http.Request) {
+	if err := s.pool.Ping(r.Context()); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "db unreachable"})
+		return
+	}
+	if err := s.rdb.Ping(r.Context()).Err(); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "redis unreachable"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "db": "up", "redis": "up"})
+}
+</script>
+
+<h3>Startup: config and connections</h3>
+<p>Config comes from environment variables, so the same binary runs on a laptop and on EC2. A missing secret stops the process at startup instead of failing on the first request:</p>
+<script type="text/x-code" data-lang="go" data-file="internal/config/config.go">
+func required(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("required environment variable not set: %s", key)
+	}
+	return value
+}
+func Load() *Config {
+	return &Config{
+		DatabaseURL: required("DATABASE_URL"),
+		RedisURL:    required("REDIS_URL"),
+		JWTSecret:   required("JWT_SECRET"),
+		Port:        optional("PORT", "8080"),
+	}
+}
+</script>
+<p><code>pgxpool.New</code> is lazy and does not connect, so the code pings to fail fast. Redis uses the URL scheme to choose TLS: <code>redis://</code> locally and <code>rediss://</code> on ElastiCache.</p>
+<script type="text/x-code" data-lang="go" data-file="internal/db/db.go and internal/redisc/redis.go">
+pool, err := pgxpool.New(ctx, url)
+if err := pool.Ping(ctx); err != nil {
+	return nil, fmt.Errorf("ping db: %w", err)
+}
+
+opts, err := redis.ParseURL(url)   // rediss:// switches TLS on
+c := redis.NewClient(opts)
+if err := c.Ping(ctx).Err(); err != nil { ... }
+</script>
+
+<h2 id="data">4. Data model</h2>
+<div class="diagram">
+<pre class="mermaid">
+erDiagram
+  users ||--o{ submissions : makes
+  problems ||--o{ submissions : receives
+  problems ||--o{ test_cases : has
+  users {
+    bigint id PK
+    text username UK
+    text email UK
+    text password_hash
+  }
+  problems {
+    bigint id PK
+    text slug UK
+    int time_limit_ms
+    int memory_limit_mb
+  }
+  test_cases {
+    bigint id PK
+    bigint problem_id FK
+    int ordinal
+    text input
+    text expected
+  }
+  submissions {
+    bigint id PK
+    bigint user_id FK
+    bigint problem_id FK
+    text language
+    text code
+    text status
+    text verdict
+    int time_ms
+  }
+</pre>
+</div>
+<script type="text/x-code" data-lang="sql" data-file="migrations/001_init.sql">
+CREATE TABLE submissions (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    BIGINT NOT NULL REFERENCES users(id),
+    problem_id BIGINT NOT NULL REFERENCES problems(id),
+    language   TEXT NOT NULL CHECK (language IN ('python', 'cpp', 'go')),
+    code       TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'pending'
+               CHECK (status IN ('pending', 'running', 'done')),
+    verdict    TEXT CHECK (verdict IN ('Accepted', 'Wrong Answer',
+               'Time Limit Exceeded', 'Runtime Error', 'Compile Error')),
+    time_ms    INT,
+    memory_mb  INT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- "My submissions for this problem, newest first" is the hot query.
+CREATE INDEX submissions_user_problem_idx
+  ON submissions (user_id, problem_id, created_at DESC);
+-- Only unfinished rows are indexed: tiny, and exactly what a stuck-job sweeper scans.
+CREATE INDEX submissions_status_idx ON submissions (status) WHERE status <> 'done';
+</script>
+<h3>Why the schema looks like this</h3>
+<ul>
+  <li><b>Constraints do the policing.</b> <code>UNIQUE</code>, <code>CHECK</code> and <code>REFERENCES</code> mean a bug in Go cannot create an impossible row.</li>
+  <li><b><code>status</code> and <code>verdict</code> are separate.</b> <code>status</code> is the job lifecycle. <code>verdict</code> is the answer and stays NULL until judged. "Is it finished?" and "was it right?" are different questions.</li>
+  <li><b>The partial index</b> ignores finished rows, so it stays small no matter how many submissions accumulate.</li>
+  <li><b>Test cases are their own table</b> with <code>ON DELETE CASCADE</code> so deleting a problem cannot orphan them.</li>
+  <li><b>Postgres vs Redis:</b> Postgres gives durability and constraints. Redis gives speed. Anything a user would be angry to lose lives in Postgres.</li>
+</ul>
+<div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> pending: API INSERT
+  pending --> running: worker claim (atomic UPDATE)
+  running --> done: verdict written
+  running --> pending: infrastructure failure, retry
+  done --> [*]
+</pre>
+<p class="cap">The submission lifecycle. The only transition guarded by a race is pending to running, and it is guarded by a conditional UPDATE.</p>
+</div>
+
+<h2 id="hld">5. High-level design</h2>
+<p>Draw the happy path first, then say what each box is responsible for, and nothing else.</p>
+<div class="tablewrap"><table>
+<tr><th>Component</th><th>One job</th><th>Does not do</th></tr>
+<tr><td>nginx</td><td>Serve the React build; proxy <code>/api</code> and <code>/ws</code> on one origin</td><td>No business logic</td></tr>
+<tr><td>Go API</td><td>Authenticate, validate, record, enqueue, serve reads, hold WebSockets</td><td>Never runs user code</td></tr>
+<tr><td>PostgreSQL</td><td>Durable truth: users, problems, tests, submissions</td><td>Not on the real-time path</td></tr>
+<tr><td>Redis list</td><td>Wake-up queue of submission ids</td><td>Not the source of truth</td></tr>
+<tr><td>Worker</td><td>Claim, judge, record, update ranking</td><td>Never talks to browsers</td></tr>
+<tr><td>Docker sandbox</td><td>Run one program under strict limits</td><td>Has no network, no secrets</td></tr>
+<tr><td>Redis ZSET + Pub/Sub</td><td>Fast ranking and change notification</td><td>Rebuildable from Postgres</td></tr>
+<tr><td>WebSocket hub</td><td>Fan out change events to connected browsers</td><td>Holds no durable state</td></tr>
+</table></div>
+
+<div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as Browser
+  participant A as Go API
+  participant P as PostgreSQL
+  participant Q as Redis queue
+  participant W as Worker
+  participant D as Docker
+  participant Z as Redis ZSET and PubSub
+  participant H as WS hub
+  U->>A: POST /api/submit (JWT, code)
+  A->>P: INSERT submission (pending)
+  A->>Q: LPUSH id
+  A-->>U: 202 + submission_id
+  W->>Q: BRPOP (blocks)
+  Q-->>W: id
+  W->>P: UPDATE status=running WHERE status=pending
+  W->>D: docker run per test case
+  D-->>W: stdout, exit code, time
+  W->>P: UPDATE verdict, status=done
+  W->>Z: ZADD score, PUBLISH standing
+  Z-->>H: message
+  H-->>U: WebSocket push
+  U->>A: GET /api/submissions/id and /api/leaderboard
+</pre>
+<p class="cap">Sequence view of one submission. Notice that the browser's HTTP request ends at step 4; everything after is asynchronous.</p>
+</div>
+
+<h3>Design decisions at this level</h3>
+<div class="tablewrap"><table>
+<tr><th>Decision</th><th>Alternative</th><th>Why this one</th></tr>
+<tr><td>Async queue + 202</td><td>Judge inside the request</td><td>Judging takes seconds and is CPU heavy; it would hold connections and couple API and judge capacity.</td></tr>
+<tr><td>Redis list for the queue</td><td>SQS, RabbitMQ, Redis Streams, Postgres SKIP LOCKED</td><td>Simple, already needed for the leaderboard, blocking pop with no polling. Weakness: at-most-once (see chapter 11).</td></tr>
+<tr><td>Separate worker process</td><td>Goroutines inside the API</td><td>Independent scaling and failure isolation; a runaway judge cannot take down the API.</td></tr>
+<tr><td>Sorted set for ranking</td><td>ORDER BY in SQL on every request</td><td>O(log n) update, pre-sorted top-k read.</td></tr>
+<tr><td>Pub/Sub for live updates</td><td>Worker calls the API; polling only</td><td>Works across many API instances without them knowing each other.</td></tr>
+<tr><td>JWT</td><td>Server-side sessions</td><td>Any instance can verify with the secret; no shared session store.</td></tr>
+</table></div>
+
+<h2 id="auth">6a. Deep dive: authentication</h2>
+<h3>Passwords: bcrypt</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/auth/auth.go">
+// bcrypt silently ignores bytes past 72, so callers must reject longer passwords.
+const MaxPasswordBytes = 72
+
+func HashPassword(password string) (string, error) {
+	b, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(b), err
+}
+
+func CheckPassword(hash, password string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
+</script>
+<div class="say"><p>Passwords are hashed with bcrypt: salted and deliberately slow, so a stolen database is expensive to brute-force. The salt and cost are stored inside the hash string. I reject passwords over 72 bytes because bcrypt would silently ignore the rest.</p></div>
+
+<h3>Register: validation, injection safety, and the signup race</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/api/auth_handlers.go">
+// Cap the body so a client cannot make us buffer gigabytes.
+json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in)
+
+in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+if len(in.Username) < 3 || len(in.Username) > 32 { ... 400 }
+if _, err := mail.ParseAddress(in.Email); err != nil { ... 400 }
+if len(in.Password) < 8 || len(in.Password) > auth.MaxPasswordBytes { ... 400 }
+
+// $1..$3 placeholders: values are never concatenated into SQL.
+err = s.pool.QueryRow(r.Context(),
+	`INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id`,
+	in.Username, in.Email, hash).Scan(&id)
+if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {   // "23505"
+	writeError(w, http.StatusConflict, "username or email already taken")
+	return
+}
+</script>
+<ul>
+  <li><b>SQL injection:</b> parameter placeholders keep data separate from the query text.</li>
+  <li><b>Race on usernames:</b> a <code>SELECT</code> then <code>INSERT</code> lets two simultaneous requests both pass the check. The <code>UNIQUE</code> constraint makes Postgres pick exactly one winner, and error <code>23505</code> becomes HTTP 409.</li>
+  <li><b>Body cap:</b> <code>MaxBytesReader</code> bounds memory per request.</li>
+</ul>
+
+<h3>Login: no username enumeration</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/api/auth_handlers.go">
+// Same message for "no such user" and "wrong password" so the endpoint
+// cannot be used to discover which usernames exist.
+if errors.Is(err, pgx.ErrNoRows) || (err == nil && !auth.CheckPassword(hash, in.Password)) {
+	writeError(w, http.StatusUnauthorized, "invalid username or password")
+	return
+}
+</script>
+
+<h3>JWT: stateless, algorithm pinned, expiry required</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/auth/auth.go">
+func IssueToken(secret string, userID int64) (string, error) {
+	now := time.Now()
+	claims := jwt.RegisteredClaims{
+		Subject:   strconv.FormatInt(userID, 10),
+		IssuedAt:  jwt.NewNumericDate(now),
+		ExpiresAt: jwt.NewNumericDate(now.Add(tokenTTL)),   // 24h
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
+}
+
+func ParseToken(secret, token string) (int64, error) {
+	var claims jwt.RegisteredClaims
+	_, err := jwt.ParseWithClaims(token, &claims, func(*jwt.Token) (any, error) {
+		return []byte(secret), nil
+	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
+	if err != nil { return 0, err }
+	return strconv.ParseInt(claims.Subject, 10, 64)
+}
+</script>
+<div class="say"><p>The token carries the user id in <code>sub</code> and is signed with HMAC-SHA256. Any API instance that holds the secret can verify it, so there is no session store and the API scales horizontally. On verify I pin the algorithm and require an expiry, which blocks <code>alg: none</code> and algorithm-swap attacks.</p></div>
+<div class="trap"><p>A stateless token cannot be revoked before it expires, and a token in <code>localStorage</code> is readable by any script on the page (XSS). Fixes: short-lived access tokens with refresh tokens, httpOnly cookies, or a denylist in Redis.</p></div>
+
+<h3>Middleware: verify once, pass the id by context</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/auth/auth.go">
+func Middleware(secret string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+			if !ok || tok == "" { 401; return }
+			id, err := ParseToken(secret, tok)
+			if err != nil { 401; return }
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, id)))
+		})
+	}
+}
+</script>
+<p>Handlers read the user with <code>auth.UserID(ctx)</code> and never parse tokens. The context key is an unexported struct type, so no other package can collide with it.</p>
+
+<h2 id="submit">6b. Deep dive: POST /api/submit</h2>
+<script type="text/x-code" data-lang="go" data-file="internal/api/submit_handlers.go">
+if in.ProblemID <= 0 || !validLanguages[in.Language] || in.Code == "" || len(in.Code) > maxCodeBytes {
+	writeError(w, http.StatusBadRequest, "need problem_id, language (python|cpp|go) and code (<=64KB)")
+	return
+}
+
+// 1. Durable first: Postgres is the source of truth.
+err := s.pool.QueryRow(r.Context(),
+	`INSERT INTO submissions (user_id, problem_id, language, code)
+	 VALUES ($1, $2, $3, $4) RETURNING id`,
+	uid, in.ProblemID, in.Language, in.Code).Scan(&id)
+if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation {   // "23503"
+	writeError(w, http.StatusNotFound, "problem not found")
+	return
+}
+
+// 2. Then enqueue only the id.
+if err := s.rdb.LPush(r.Context(), JudgeQueue, id).Err(); err != nil {
+	writeError(w, http.StatusServiceUnavailable, "queue unavailable, submission saved as pending")
+	return
+}
+
+// 3. Reply immediately.
+writeJSON(w, http.StatusAccepted, map[string]any{"submission_id": id, "status": "pending"})
+</script>
+<h3>Every choice, explained</h3>
+<ul>
+  <li><b>202, not 200.</b> The request was accepted for processing; the result is not ready.</li>
+  <li><b>DB before queue.</b> If Redis fails after the insert, the row is still <code>pending</code> and can be re-queued. The reverse order could queue an id for a row that does not exist. The failure mode is "delayed", never "lost".</li>
+  <li><b>Only the id in the queue.</b> The queue stays tiny, there is one copy of the code, and the worker always reads the current row.</li>
+  <li><b>Foreign-key error becomes 404</b>, not a 500, so a bad problem id is a client error.</li>
+  <li><b>64 KB code cap and 1 MB body cap</b> bound memory and DB growth.</li>
+</ul>
+<div class="trap"><p>This is a dual write: Postgres and then Redis, with no shared transaction. If the API dies between the two, the row sits as <code>pending</code> and is never queued. The rigorous fix is a transactional outbox: write the job to an <code>outbox</code> table in the same transaction and let a relay push it. My lightweight version would be a sweeper that re-queues old <code>pending</code> rows. I have not built it.</p></div>
+<h3>Reading the result back</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/api/submit_handlers.go">
+`SELECT id, problem_id, language, status, verdict, time_ms, memory_mb
+ FROM submissions WHERE id = $1 AND user_id = $2`   // owner check lives in the query
+
+type submissionView struct {
+	Verdict *string `json:"verdict"`   // pointer: SQL NULL becomes JSON null
+	...
+}
+</script>
+
+<h2 id="worker">6c. Deep dive: the judge worker</h2>
+<h3>Process shape and graceful shutdown</h3>
+<script type="text/x-code" data-lang="go" data-file="cmd/worker/main.go and internal/judge/judge.go">
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+defer stop()
+...
+(&judge.Worker{Pool: pool, RDB: rdb}).Run(ctx, n)   // n from WORKERS, default 2
+
+func (w *Worker) Run(ctx context.Context, n int) {
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			w.loop(ctx, id)
+		}(i)
+	}
+	wg.Wait()   // returns only after every in-flight job finished
+}
+</script>
+<p>N goroutines each block on the queue, so N submissions are judged at once. On SIGTERM the context is cancelled, the loops stop taking jobs, and <code>wg.Wait()</code> lets running jobs finish.</p>
+
+<h3>The loop: blocking pop, no polling</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+for ctx.Err() == nil {
+	// Blocks inside Redis for up to 5s, then returns redis.Nil so we can
+	// re-check for shutdown. No polling, no busy loop.
+	res, err := w.RDB.BRPop(ctx, 5*time.Second, queueKey).Result()
+	if errors.Is(err, redis.Nil) || ctx.Err() != nil { continue }
+	...
+	// Background ctx: a shutdown signal must not abort a half-judged job.
+	if err := w.process(context.Background(), subID); err != nil { log.Printf(...) }
+}
+</script>
+
+<h3>The atomic claim</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+tag, err := w.Pool.Exec(ctx,
+	`UPDATE submissions SET status = 'running' WHERE id = $1 AND status = 'pending'`, id)
+if err != nil { return err }
+if tag.RowsAffected() == 0 { return nil }   // someone else already has it
+</script>
+<div class="say"><p>A conditional UPDATE is atomic in Postgres. If the same id were delivered twice, exactly one worker sees one affected row and the other does nothing. Delivery can be duplicated; processing cannot.</p></div>
+
+<h3>Infrastructure failure is not a wrong answer</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+res, err := w.judge(ctx, id, problemID, lang, code, timeLimit, memMB)
+if err != nil {
+	// Docker down, not the user's fault: put it back instead of faking a verdict.
+	_, _ = w.Pool.Exec(ctx, `UPDATE submissions SET status = 'pending' WHERE id = $1`, id)
+	return err
+}
+</script>
+
+<h3>Finish: verdict first, leaderboard best-effort</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+_, err = w.Pool.Exec(ctx,
+	`UPDATE submissions SET status = 'done', verdict = $2, time_ms = $3 WHERE id = $1`,
+	id, res.verdict, res.timeMS)
+...
+// A failure here must not undo the verdict: the board can be rebuilt from Postgres.
+if err := leaderboard.Update(ctx, w.Pool, w.RDB, userID); err != nil {
+	log.Printf("leaderboard update for user %d: %v", userID, err)
+}
+</script>
+
+<h3>Running the tests and choosing a verdict</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/judge.go">
+dir, _ := os.MkdirTemp("", "codium-*")
+defer os.RemoveAll(dir)
+os.Chmod(dir, 0o755)   // container runs as "nobody", so the dir must be readable
+os.WriteFile(filepath.Join(dir, spec.file), []byte(code), 0o644)
+
+if spec.compile != nil {   // C++ and Go compile once
+	r, err := dockerRun(ctx, prefix+"-c", compileArgs(prefix+"-c", dir, spec), "", 60*time.Second)
+	if err != nil { return verdictResult{}, err }
+	if r.timedOut || r.exitCode != 0 { return verdictResult{verdict: "Compile Error"}, nil }
+}
+
+for i, t := range tests {
+	r, err := dockerRun(ctx, name, runArgs(name, dir, spec, memMB), t.in,
+		time.Duration(timeLimit)*time.Millisecond+startupGrace)
+	switch {
+	case r.timedOut:                               return verdictResult{"Time Limit Exceeded", ms}, nil
+	case r.exitCode != 0:                          return verdictResult{"Runtime Error", ms}, nil  // 137 = memory kill
+	case normalize(r.stdout) != normalize(t.want): return verdictResult{"Wrong Answer", ms}, nil
+	}
+}
+return verdictResult{"Accepted", int(worst.Milliseconds())}, nil
+
+func normalize(s string) string {
+	lines := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+	for i := range lines { lines[i] = strings.TrimRight(lines[i], " \t") }
+	return strings.TrimRight(strings.Join(lines, "\n"), "\n")
+}
+</script>
+<div class="tablewrap"><table>
+<tr><th>What happened</th><th>Verdict</th></tr>
+<tr><td>Compile step failed or timed out</td><td>Compile Error</td></tr>
+<tr><td>Wall-clock limit exceeded (container removed)</td><td>Time Limit Exceeded</td></tr>
+<tr><td>Non-zero exit; 137 means the kernel killed it for memory</td><td>Runtime Error</td></tr>
+<tr><td>Output differs after trimming trailing whitespace</td><td>Wrong Answer</td></tr>
+<tr><td>Every test passed</td><td>Accepted</td></tr>
+</table></div>
+<p>It stops at the first failing test, like real judges, and reports the worst time seen. Adding a language is one entry in the <code>langs</code> map.</p>
+
+<h2 id="sandbox">6d. Deep dive: the sandbox</h2>
+<p>This is the part interviewers push on, because you are running strangers' code on your machine.</p>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/sandbox.go">
+func baseArgs(name string, memMB int) []string {
+	return []string{"run", "--rm", "-i", "--name", name,
+		"--network=none",                        // no internet, no access to our VPC or RDS
+		"--cpus=1",
+		fmt.Sprintf("--memory=%dm", memMB),
+		fmt.Sprintf("--memory-swap=%dm", memMB), // no swap: memory limit is hard
+		"--pids-limit=64",                       // fork-bomb protection
+		"--cap-drop=ALL",
+		"--security-opt=no-new-privileges",
+	}
+}
+
+func runArgs(name, dir string, spec langSpec, memMB int) []string {
+	a := baseArgs(name, memMB)
+	a = append(a, "--read-only", "--tmpfs", "/tmp:rw,size=16m",
+		"--user", "65534:65534", "-v", dir+":/work:ro")
+	...
+}
+</script>
+<div class="tablewrap"><table>
+<tr><th>Flag</th><th>Attack it stops</th></tr>
+<tr><td><code>--network=none</code></td><td>Calling the internet, or reaching RDS and Redis inside the VPC</td></tr>
+<tr><td><code>--cpus=1</code></td><td>One submission using every core</td></tr>
+<tr><td><code>--memory</code> = <code>--memory-swap</code></td><td>Memory bombs. Equal values mean no swap, so the limit is hard and the kernel kills the process (exit 137)</td></tr>
+<tr><td><code>--pids-limit=64</code></td><td>Fork bombs</td></tr>
+<tr><td><code>--cap-drop=ALL</code></td><td>Linux capabilities such as raw sockets or mounting</td></tr>
+<tr><td><code>no-new-privileges</code></td><td>Gaining privilege through setuid binaries</td></tr>
+<tr><td><code>--read-only</code> + small tmpfs</td><td>Writing to the filesystem or filling the disk</td></tr>
+<tr><td><code>--user 65534:65534</code></td><td>Running as root inside the container (runs as <code>nobody</code>)</td></tr>
+<tr><td><code>-v dir:/work:ro</code></td><td>Modifying the submitted code or other files</td></tr>
+<tr><td><code>--rm</code></td><td>Stopped containers piling up</td></tr>
+</table></div>
+<p>The compile step is looser on purpose: <code>/work</code> is read-write so the compiler can write the binary. The <em>run</em> step is the strict one.</p>
+
+<h3>Timeouts: kill the container, not just the CLI</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/sandbox.go">
+ctx, cancel := context.WithTimeout(ctx, timeout)
+defer cancel()
+cmd := exec.CommandContext(ctx, "docker", args...)
+cmd.Stdin = strings.NewReader(stdin)
+...
+if ctx.Err() == context.DeadlineExceeded {
+	res.timedOut = true
+	// Killing the docker CLI does NOT stop the container; remove it by name.
+	_ = exec.Command("docker", "rm", "-f", name).Run()
+	return res, nil
+}
+if ee, ok := err.(*exec.ExitError); ok {
+	res.exitCode = ee.ExitCode()
+	return res, nil       // the program failed: that is a verdict
+}
+return res, err           // docker itself could not run: infrastructure error
+</script>
+<div class="say"><p>Cancelling the context kills the docker client process, but the container keeps running. I give every container a unique name and remove it by name. Without that, an infinite loop would leak a container forever.</p></div>
+
+<h3>Output cap</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/judge/sandbox.go">
+type limitedBuffer struct{ bytes.Buffer }
+
+func (b *limitedBuffer) Write(p []byte) (int, error) {
+	if b.Len()+len(p) > maxOutputBytes {            // 1 MB
+		p = p[:max(0, maxOutputBytes-b.Len())]
+	}
+	b.Buffer.Write(p)
+	return len(p), nil   // pretend success so the child is not blocked by a broken pipe
+}
+</script>
+<div class="trap"><p>Containers share the host kernel, so a kernel exploit is still possible. For hostile production traffic I would add gVisor or Firecracker, seccomp profiles and disk quotas. Wall-clock time includes Docker start-up (about 0.3 to 0.5 s), so I add a 1.5 s grace; a real judge measures CPU time with cgroups. <code>memory_mb</code> is limited but never measured, so it is NULL.</p></div>
+
+<h2 id="leaderboard">6e. Deep dive: the leaderboard</h2>
+<p><b>Rule (ICPC style).</b> More problems solved wins. Ties break on lower penalty. Each judged wrong try before the first Accepted on a solved problem adds 20.</p>
+<script type="text/x-code" data-lang="go" data-file="internal/leaderboard/leaderboard.go">
+const (
+	penaltyPerTry = 20
+	solvedWeight  = 1_000_000
+)
+
+// Score = solved*1e6 - penalty, so more solved always wins, then lower penalty.
+score := float64(st.Solved*solvedWeight - st.Penalty)
+rdb.ZAdd(ctx, Key, redis.Z{Score: score, Member: st.Username})
+msg, _ := json.Marshal(st)
+rdb.Publish(ctx, Channel, msg)
+</script>
+<p>Packing two sort keys into one number lets a single sorted set order users correctly. One extra solve is worth 1,000,000, which no realistic penalty can reach.</p>
+
+<h3>Recompute, do not increment</h3>
+<script type="text/x-code" data-lang="sql" data-file="internal/leaderboard/leaderboard.go">
+WITH first_ac AS (
+  SELECT problem_id, min(created_at) AS t
+  FROM submissions WHERE user_id = $1 AND verdict = 'Accepted'
+  GROUP BY problem_id)
+SELECT
+  (SELECT username FROM users WHERE id = $1),
+  count(*),                                   -- problems solved
+  coalesce(sum($2 * (                         -- 20 per judged try before first AC
+    SELECT count(*) FROM submissions s
+    WHERE s.user_id = $1 AND s.problem_id = f.problem_id
+      AND s.status = 'done' AND s.created_at < f.t)), 0)
+FROM first_ac f
+</script>
+<div class="say"><p>After each verdict I recompute that user's standing from Postgres and ZADD it. ZADD with an existing member just overwrites the score, so running it twice is harmless. ZINCRBY would double-count on a retry. And if Redis is wiped, the whole board can be rebuilt from Postgres.</p></div>
+
+<h3>Reading the board</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/leaderboard/leaderboard.go">
+members, err := rdb.ZRevRangeWithScores(ctx, Key, 0, n-1).Result()   // already ordered
+...
+solved := (score + solvedWeight - 1) / solvedWeight    // decode solved count from the score
+Penalty: solved*solvedWeight - score
+...
+fillCells(ctx, pool, out)   // per-problem grid for ALL listed users in ONE query (= ANY($1))
+</script>
+<p>Ranking comes from Redis; the per-problem cells (solved, tries) come from Postgres in a single query, which avoids an N+1 pattern. Each store does what it is good at. <code>ZADD</code> is O(log n) and the top-k read is O(log n + k), against a scan of all submissions for an <code>ORDER BY</code>.</p>
+
+<h2 id="ws">6f. Deep dive: WebSocket hub and Pub/Sub</h2>
+<h3>Why Pub/Sub</h3>
+<p>With two API servers behind a load balancer, a browser is connected to only one. The worker is a different process and knows no sockets. So the worker publishes once to Redis, every API instance subscribes, and each pushes to its own browsers.</p>
+<div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  W[Worker] -->|PUBLISH| R[(Redis Pub/Sub)]
+  R --> A1[API instance 1]
+  R --> A2[API instance 2]
+  A1 --> B1[Browsers on 1]
+  A2 --> B2[Browsers on 2]
+</pre>
+</div>
+<script type="text/x-code" data-lang="go" data-file="internal/ws/hub.go">
+// One subscription per API instance, not one per browser.
+sub := rdb.Subscribe(ctx, leaderboard.Channel)
+defer sub.Close()
+for {
+	select {
+	case <-ctx.Done():
+		return
+	case msg, ok := <-sub.Channel():
+		if !ok { return }
+		h.broadcast([]byte(msg.Payload))
+	}
+}
+</script>
+
+<h3>A slow client must not stall everyone</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/ws/hub.go">
+const sendBuffer = 16   // messages a client may fall behind before we drop it
+
+func (h *Hub) broadcast(msg []byte) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for c := range h.clients {
+		select {
+		case c.send <- msg:
+		default:
+			// Buffer full: drop this client rather than block the loop.
+			delete(h.clients, c)
+			close(c.send)
+		}
+	}
+}
+</script>
+<p>Each client has a bounded channel. <code>select</code> with <code>default</code> makes the send non-blocking. The mutex protects the client map.</p>
+
+<h3>One reader and one writer per connection</h3>
+<script type="text/x-code" data-lang="go" data-file="internal/ws/hub.go">
+go h.writePump(c)   // the ONLY goroutine that writes (gorilla allows one concurrent writer)
+h.readPump(c)       // blocks until the browser disconnects
+
+// readPump keeps the pong deadline fresh; writePump pings every 30s.
+c.conn.SetReadDeadline(time.Now().Add(pongWait))      // 60s
+c.conn.SetPongHandler(func(string) error {
+	return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+})
+</script>
+<p>Ping and pong detect half-dead connections, such as a laptop that went to sleep, which TCP alone would not notice for a long time.</p>
+<div class="trap"><p>Redis Pub/Sub is fire-and-forget: a message sent while a subscriber is disconnected is gone. That is acceptable here because the message is only an invalidate signal. On reconnect or the next page load the browser refetches the full board. <code>CheckOrigin</code> returns true because the board is public read-only data; for private streams I would check the <code>Origin</code> header.</p></div>
+
+<h2 id="frontend">6g. Deep dive: the frontend and the live diagram</h2>
+<h3>One API layer</h3>
+<script type="text/x-code" data-lang="ts" data-file="web/src/api/http.ts">
+export const API_BASE: string =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8080' : window.location.origin)
+export const WS_BASE = API_BASE.replace(/^http/, 'ws')
+
+export async function call<T>(path: string, { method = 'GET', body, token, signal }: Opts = {}): Promise<T> {
+  const res = await fetch(API_BASE + path, {
+    method, signal,
+    headers: {
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new ApiError(res.status, data.error ?? `Request failed (${res.status})`)
+  return data as T
+}
+</script>
+<p>In development it talks to <code>localhost:8080</code> through an SSH tunnel. In a production build it uses the page's own origin, because nginx serves the site and proxies the API. One origin means no CORS problem.</p>
+
+<h3>Submit, then poll, woken early by the push</h3>
+<script type="text/x-code" data-lang="ts" data-file="web/src/api/judge.ts">
+onStage(0, 'POST /api/submit sent with your JWT')
+const { submission_id } = await call('/api/submit', { method: 'POST', token, signal, body: {...} })
+onStage(1, `202 Accepted, submission #${submission_id}...`)
+
+while (Date.now() < deadline) {
+  await Promise.race([wait(700), push.arrived])   // a push means the verdict is already stored
+  const s = await call(`/api/submissions/${submission_id}`, { token, signal })
+  if (s.status === 'running' && !sawRunning) { sawRunning = true; onStage(2, '...') }
+  if (s.status === 'done' && s.verdict) { onStage(3, '...'); ... return done }
+}
+</script>
+<p>The browser also opens the leaderboard socket and waits for a message about <em>its own</em> username. When it arrives, the poll loop wakes early. Polling alone is a correct fallback; the socket is an optimisation.</p>
+
+<h3>The live pipeline diagram is driven by real events</h3>
+<div class="tablewrap"><table>
+<tr><th>Stage</th><th>What the browser really saw</th><th>Arrows that light up</th></tr>
+<tr><td>0</td><td>Request sent</td><td>1 (POST)</td></tr>
+<tr><td>1</td><td>HTTP 202 received</td><td>2, 3, 4 (reply, INSERT, LPUSH)</td></tr>
+<tr><td>2</td><td>Poll returned <code>running</code></td><td>5, 6 (BRPOP, claim)</td></tr>
+<tr><td>3</td><td>Poll returned <code>done</code> with a verdict</td><td>7, 8 (docker, UPDATE)</td></tr>
+<tr><td>4</td><td>WebSocket push for my username</td><td>9, 10, 11 (ZADD and PUBLISH, Pub/Sub, push)</td></tr>
+</table></div>
+<script type="text/x-code" data-lang="ts" data-file="web/src/components/Pipeline.tsx">
+// An edge is idle before `from`, animated while from <= stage < to, done once stage >= to.
+const edgeState = (e: Edge): EState => {
+  if (cur < 0 && !running) return 'idle'
+  if (cur >= e.to) return 'done'
+  if (pushFailed && e.from >= 3) return 'failed'      // push never came: show red
+  const s = Math.max(cur, running && cur < 0 ? 0 : cur)
+  return s >= e.from && s < e.to ? 'active' : 'idle'
+}
+</script>
+<div class="say"><p>Nothing in the diagram is faked. Each light-up is triggered by something the browser actually observed. If the WebSocket push does not arrive within four seconds, the last edges turn red and the caption says so. Slow motion, Replay and Prev/Next walk through the recorded events with delays; they do not invent any.</p></div>
+<div class="trap"><p>Stages 2 and 3 are accurate only to the 700 ms poll interval, and the UI says so under the log.</p></div>
+
+<h2 id="failures">7. Failure modes: ask "what if it dies" for every box</h2>
+<div class="tablewrap"><table>
+<tr><th>What fails</th><th>What the user sees</th><th>What is preserved</th><th>Recovery</th></tr>
+<tr><td>Redis down at submit</td><td>503 "queue unavailable, saved as pending"</td><td>Row in Postgres</td><td>Re-queue <code>pending</code> rows when Redis is back</td></tr>
+<tr><td>Redis loses its data</td><td>Queue and board empty</td><td>Everything in Postgres</td><td>Re-queue pending; rebuild board from Postgres</td></tr>
+<tr><td>API dies between INSERT and LPUSH</td><td>Request error</td><td>Row stays <code>pending</code></td><td>Sweeper (not built); outbox is the rigorous fix</td></tr>
+<tr><td>Worker dies mid-judge</td><td>Spinner, then timeout message</td><td>Row stuck in <code>running</code></td><td>Sweeper that requeues old <code>running</code> rows (not built)</td></tr>
+<tr><td>Docker fails</td><td>Delay</td><td>Row set back to <code>pending</code></td><td>Retry once Docker is fixed</td></tr>
+<tr><td>Same id delivered twice</td><td>Nothing</td><td>One judge run</td><td>Atomic claim ignores the second</td></tr>
+<tr><td>Leaderboard update fails</td><td>Verdict shows; board lags</td><td>Verdict in Postgres</td><td>Recompute is idempotent; next verdict repairs it</td></tr>
+<tr><td>Postgres down</td><td>5xx; <code>/healthz</code> 503</td><td>n/a</td><td>RDS Multi-AZ failover (not enabled)</td></tr>
+<tr><td>WebSocket drops</td><td>No live update</td><td>All data</td><td>Page refetch; poll continues</td></tr>
+</table></div>
+<div class="say"><p>I designed for at-least-once delivery and made the work idempotent, because exactly-once does not exist across Redis and Postgres. The claim query makes a duplicate harmless, and the leaderboard recompute makes a retry harmless.</p></div>
+
+<h2 id="scale">8. Scaling: find the bottleneck, then the next one</h2>
+<div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph Now[Now]
+    N1[1 EC2 with nginx, API, worker, Docker]
+  end
+  subgraph Step1[Step 1 workers]
+    S1[more worker processes or hosts]
+  end
+  subgraph Step2[Step 2 API]
+    S2[load balancer + several API instances]
+  end
+  subgraph Step3[Step 3 data]
+    S3[RDS read replica or RDS Proxy; Redis replicas]
+  end
+  Now --> Step1 --> Step2 --> Step3
+</pre>
+</div>
+<ol class="steps">
+  <li><b>Workers first.</b> Judging is the only expensive step. Run more worker processes, raise <code>WORKERS</code>, or put workers on their own hosts. They share only the queue and the database, so this needs no code change. Size by Little's law (chapter 2).</li>
+  <li><b>API instances.</b> The API is stateless because of JWT, so put several behind a load balancer. WebSockets already fan out correctly through Pub/Sub.</li>
+  <li><b>Database.</b> Add a read replica for leaderboard cells and problem reads. Add connection pooling (RDS Proxy or pgbouncer) when instance count grows.</li>
+  <li><b>Queue.</b> If volume or delivery guarantees demand it, move to Redis Streams with consumer groups, or SQS.</li>
+  <li><b>Isolation.</b> Run judge hosts in a separate, locked-down subnet so a sandbox escape cannot reach the API or database hosts.</li>
+</ol>
+<div class="trap"><p>I have run one API and one worker. The design allows scale-out; I have not load-tested it.</p></div>
+
+<h2 id="security">9. Security summary</h2>
+<div class="tablewrap"><table>
+<tr><th>Threat</th><th>Defence in the code</th></tr>
+<tr><td>Hostile submitted code</td><td>Sandbox flags (chapter 6d), timeout with forced removal, output cap</td></tr>
+<tr><td>SQL injection</td><td>Parameterised queries everywhere</td></tr>
+<tr><td>Stolen password database</td><td>bcrypt with salt</td></tr>
+<tr><td>Username discovery</td><td>Identical login error for both failure cases</td></tr>
+<tr><td>Token forgery</td><td>HMAC signature, pinned algorithm, required expiry</td></tr>
+<tr><td>Reading others' submissions</td><td><code>AND user_id = $2</code> in the query</td></tr>
+<tr><td>Memory exhaustion by requests</td><td>Body size caps, 64 KB code cap</td></tr>
+<tr><td>Database reachable from the internet</td><td>RDS and ElastiCache are private; only the EC2 security group may connect</td></tr>
+<tr><td>Eavesdropping on Redis traffic</td><td>TLS (<code>rediss://</code>) to ElastiCache</td></tr>
+<tr><td>Exposed app port</td><td>Port 8080 closed; only nginx on 80 and SSH from my IP</td></tr>
+</table></div>
+<div class="trap"><p>Gaps: HTTP only (no TLS to the browser), CORS is <code>*</code>, WebSocket origin is not checked, JWT sits in <code>localStorage</code>, and there is no rate limit on <code>/api/submit</code>.</p></div>
+
+<h2 id="aws">10. AWS deployment</h2>
+<div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  I((Internet)) -->|80| E
+  subgraph E["EC2 t3.micro, eu-north-1"]
+    N[nginx] --> API[codium-api :8080]
+    N --> SPA[React build]
+    WK[codium-worker] --> DK[Docker]
+  end
+  API --> RDS[(RDS PostgreSQL private)]
+  WK --> RDS
+  API --> EC[(ElastiCache Redis private TLS)]
+  WK --> EC
+</pre>
+</div>
+<ol class="steps">
+  <li><b>Network.</b> RDS and ElastiCache have no public address. Their security groups allow traffic only from the EC2 instance's security group (security-group referencing), not from IP lists.</li>
+  <li><b>TLS to Redis.</b> ElastiCache has in-transit encryption on, so the URL is <code>rediss://</code>.</li>
+  <li><b>Build.</b> <code>CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build</code> on my Mac produces static binaries that I copy with <code>scp</code>. No Go toolchain on the server.</li>
+  <li><b>Secrets.</b> A <code>.env</code> file on the server, listed in <code>.gitignore</code>.</li>
+  <li><b>nginx.</b> Serves the static build and proxies the API and WebSocket on one origin.</li>
+</ol>
+<script type="text/x-code" data-lang="nginx" data-file="deploy/nginx.conf">
+server {
+    listen 80 default_server;
+    root /var/www/codium;
+
+    location / { try_files $uri /index.html; }       # single-page app fallback
+
+    location /api/ { proxy_pass http://127.0.0.1:8080; }
+
+    location /ws/ {                                   # WebSocket upgrade
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 3600s;                     # do not cut idle sockets
+    }
+
+    location = /healthz { proxy_pass http://127.0.0.1:8080; }
+}
+</script>
+<p>WebSockets need HTTP/1.1 plus the <code>Upgrade</code> and <code>Connection</code> headers, and a long read timeout so idle connections are not closed.</p>
+<h3>Real problems I hit (good stories, all true)</h3>
+<ul>
+  <li><b>Old binary kept answering.</b> A running executable cannot be overwritten ("text file busy"), so the new build never landed. I had to stop the process before copying.</li>
+  <li><b>Site timed out although nginx was healthy.</b> The security group had no HTTP rule. <code>curl localhost</code> on the box returned 200, while curl from my Mac timed out, which pointed at the network layer.</li>
+  <li><b>ElastiCache rejected plain Redis.</b> It requires TLS, so I switched to <code>rediss://</code>.</li>
+  <li><b><code>docker pull</code> failed: no space left on device.</b> The small root disk filled with images; I pruned unused images.</li>
+  <li><b>Browser kept timing out on the IP.</b> It auto-upgraded to https, and port 443 is closed. Typing <code>http://</code> explicitly works.</li>
+</ul>
+
+<h2 id="limits">11. Honest limitations and what I would build next</h2>
+<div class="tablewrap"><table>
+<tr><th>Limit</th><th>What to say</th><th>Fix</th></tr>
+<tr><td>Docker start-up counts toward time</td><td>Wall-clock includes about 0.3 to 0.5 s of start-up; I add a 1.5 s grace.</td><td>Long-lived sandbox; cgroup CPU accounting</td></tr>
+<tr><td><code>memory_mb</code> not measured</td><td>Memory is limited, not reported.</td><td>Read cgroup stats</td></tr>
+<tr><td>Crash leaves <code>running</code> rows</td><td>No sweeper yet; the partial index exists for it.</td><td>Requeue old <code>running</code> and <code>pending</code> rows</td></tr>
+<tr><td>List queue is at-most-once</td><td>A popped id is gone if the worker dies; Postgres still knows it.</td><td>Redis Streams with consumer groups, or SQS</td></tr>
+<tr><td>Dual write on submit</td><td>Two stores, no shared transaction.</td><td>Transactional outbox</td></tr>
+<tr><td>One global leaderboard</td><td>No contests or timers.</td><td><code>contests</code> table, <code>leaderboard:{id}</code> keys</td></tr>
+<tr><td>HTTP only, IP address, no Elastic IP</td><td>The address changes if the instance restarts.</td><td>Domain, Let's Encrypt, Elastic IP</td></tr>
+<tr><td>CORS <code>*</code>, WS origin open, token in localStorage</td><td>Fine for a demo.</td><td>Same-origin only, httpOnly cookies, origin check</td></tr>
+<tr><td>Only two problems seeded in the judge database</td><td>The frontend lists five; three are unavailable on the judge.</td><td>Seed them or serve statements from the API</td></tr>
+<tr><td>No rate limiting</td><td>A user could flood the queue.</td><td>Per-user token bucket in Redis</td></tr>
+<tr><td>No metrics or CI/CD</td><td>Logs only; manual deploy.</td><td>Prometheus and Grafana, pipeline, Secrets Manager</td></tr>
+</table></div>
+
+<h2 id="qa">12. Interview questions with answers</h2>
+<details><summary>Why a queue? Why not judge inside the request?</summary><div class="body"><p>Judging takes seconds and is CPU heavy. Inside the request it holds connections, times out under load, and ties API capacity to judge capacity. A queue absorbs bursts, workers drain at their own pace, and each side scales alone.</p></div></details>
+<details><summary>What if two workers pop the same job?</summary><div class="body"><p>The claim is <code>UPDATE ... SET status='running' WHERE id=$1 AND status='pending'</code>. Postgres makes it atomic, so only one worker gets one affected row.</p></div></details>
+<details><summary>What if Redis dies?</summary><div class="body"><p>Every submission is already in Postgres as <code>pending</code>, so nothing is permanently lost; judging is delayed. After Redis returns I re-queue pending rows and rebuild the leaderboard from Postgres. That is why Postgres is the source of truth.</p></div></details>
+<details><summary>What if the worker crashes mid-judging?</summary><div class="body"><p>The row stays <code>running</code> and the user waits. I have not built the sweeper. The design is to requeue <code>running</code> rows older than a timeout. That is safe because the claim, the verdict write and the leaderboard recompute are all idempotent.</p></div></details>
+<details><summary>What if the API crashes between the INSERT and the LPUSH?</summary><div class="body"><p>The row is <code>pending</code> but not queued. The same sweeper fixes it. I order DB first so the failure is "delayed", never "queued with no row". A transactional outbox is the fully correct solution.</p></div></details>
+<details><summary>How do you stop malicious code?</summary><div class="body"><p>Defence in depth: no network, CPU, memory and pid limits, no swap, read-only root with a small tmpfs, all capabilities dropped, no-new-privileges, non-root user, read-only code mount, a wall-clock timeout that removes the container by name, and an output cap. The remaining gap is the shared kernel, so for hostile traffic I would add gVisor or Firecracker.</p></div></details>
+<details><summary>Why Pub/Sub for WebSockets?</summary><div class="body"><p>The worker does not know which API instance holds which socket. Publishing once to Redis lets every API instance receive it and push to its own clients, and the worker and API need no direct link.</p></div></details>
+<details><summary>Pub/Sub is fire-and-forget. What if a client misses a message?</summary><div class="body"><p>The message is only an invalidate signal. On reconnect or the next load the client refetches the whole board. If I needed guaranteed delivery I would use Redis Streams.</p></div></details>
+<details><summary>Why recompute the leaderboard instead of ZINCRBY?</summary><div class="body"><p>ZINCRBY is not idempotent: a retry double-counts. Recompute plus ZADD overwrites with the correct value, so it is safe to repeat and it self-heals.</p></div></details>
+<details><summary>Why a sorted set instead of ORDER BY?</summary><div class="body"><p>O(log n) updates and O(log n + k) top-k reads, already sorted, with no scan of all submissions on every page load. Postgres still holds the truth and can rebuild it.</p></div></details>
+<details><summary>How would you scale it?</summary><div class="body"><p>Workers first, since judging is the cost: add processes or hosts. Then API instances behind a load balancer (stateless thanks to JWT, WebSockets fan out via Pub/Sub). Then a read replica and connection pooling for Postgres. If delivery guarantees matter, move the queue to Streams or SQS.</p></div></details>
+<details><summary>JWT: why, and what are the downsides?</summary><div class="body"><p>Stateless: any instance verifies with the secret. Downsides: no revocation before expiry and exposure to XSS when stored in localStorage. Mitigate with short expiry and refresh tokens, httpOnly cookies, or a denylist.</p></div></details>
+<details><summary>How is a signup race handled?</summary><div class="body"><p>By the UNIQUE constraint, not check-then-insert. The database serialises it, and I map error 23505 to HTTP 409.</p></div></details>
+<details><summary>Why 202?</summary><div class="body"><p>The request was accepted for processing and the result is not ready. 200 would imply completion.</p></div></details>
+<details><summary>Why does the worker use context.Background() for a job?</summary><div class="body"><p>So a shutdown signal cannot abort a half-judged job. The loop stops taking new jobs; running ones finish, and <code>wg.Wait()</code> blocks until they do.</p></div></details>
+<details><summary>Is the live diagram real?</summary><div class="body"><p>Yes. Each stage is triggered by something the browser observed: the 202, the polled status becoming running and done, and the WebSocket push for my username. If the push never arrives it shows red instead of faking success.</p></div></details>
+<details><summary>What would you do next?</summary><div class="body"><p>HTTPS and a domain, an Elastic IP, a stuck-job sweeper, Redis Streams or an outbox, real CPU and memory measurement, contest timers, rate limiting, metrics with Prometheus and Grafana, CI/CD, and secrets in AWS Secrets Manager.</p></div></details>
+
+<h2 id="demo">13. Three-minute demo script</h2>
+<ol class="steps">
+  <li>Open <code>http://13.60.3.224</code> (type <code>http://</code> explicitly) and say what it is in one sentence.</li>
+  <li>Log in. Mention that a JWT was issued.</li>
+  <li>Open <b>Two Sum</b>, submit the wrong answer <code>print(1)</code> with the pipeline open. Narrate the 11 arrows as they light up. The verdict is Wrong Answer.</li>
+  <li>Tick <b>Slow motion</b>, or use <b>Prev</b> and <b>Next</b>, and explain each hop using the sequence diagram.</li>
+  <li>Submit the correct solution, show <b>Accepted</b>, and show the leaderboard change without a refresh.</li>
+  <li>If asked about internals, show the worker log line <code>submission N: Accepted (Xms)</code> and <code>docker ps</code>.</li>
+</ol>
+<script type="text/x-code" data-lang="python" data-file="Two Sum: correct solution">
+n = int(input())
+a = list(map(int, input().split()))
+t = int(input())
+seen = {}
+for i, v in enumerate(a):
+    if t - v in seen:
+        print(seen[t - v], i)
+        break
+    seen[v] = i
+</script>
+<script type="text/x-code" data-lang="python" data-file="Valid Brackets: correct solution">
+s = input().strip()
+pairs = {')': '(', ']': '[', '}': '{'}
+st = []
+ok = True
+for c in s:
+    if c in '([{':
+        st.append(c)
+    elif not st or st.pop() != pairs[c]:
+        ok = False
+        break
+print('YES' if ok and not st else 'NO')
+</script>
+<div class="trap"><p>Before the interview: confirm the Python image is on EC2 (<code>docker pull python:3.12-alpine</code>), close the public 8080 rule, and run one full submission an hour before. C++ and Go submissions need their images pulled too, and the disk was tight.</p></div>
+</main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+(function(){
+  var dark=document.documentElement.getAttribute('data-theme')==='dark'||
+    (document.documentElement.getAttribute('data-theme')!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if(window.mermaid){mermaid.initialize({startOnLoad:true,theme:dark?'dark':'neutral',securityLevel:'loose',flowchart:{useMaxWidth:false}});}
+})();
+</script>
+<script>
+(function () {
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function mark(text, lang) {
+    var out = esc(text);
+    var rx = lang === 'sql' ? /(--.*)$/gm : lang === 'python' || lang === 'nginx' ? /(#.*)$/gm : /(\/\/.*)$/gm;
+    return out.replace(rx, '<span class="c">$1</span>');
+  }
+  var blocks = document.querySelectorAll('script[type="text/x-code"]');
+  Array.prototype.forEach.call(blocks, function (el) {
+    var lang = el.getAttribute('data-lang') || '';
+    var file = el.getAttribute('data-file') || lang;
+    var text = el.textContent.replace(/^\n/, '').replace(/\s+$/, '');
+    var fig = document.createElement('figure');
+    fig.className = 'code';
+    var cap = document.createElement('figcaption');
+    cap.textContent = file;
+    var pre = document.createElement('pre');
+    var code = document.createElement('code');
+    code.innerHTML = mark(text, lang);
+    pre.appendChild(code);
+    fig.appendChild(cap);
+    fig.appendChild(pre);
+    el.parentNode.replaceChild(fig, el);
+  });
+})();
+</script>
